@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/tauri-apps/tauri/dev/app-icon.png" width="128" alt="Logo" />
+  <img src="apps/desktop/app-icon.png" width="128" alt="Logo" />
   <h1>FG-Manager</h1>
   <p><strong>A blazingly fast, automated, and native desktop game manager.</strong></p>
 </div>
