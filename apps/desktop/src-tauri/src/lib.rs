@@ -2,12 +2,18 @@ use tauri::Manager;
 mod torrent;
 mod fuckingfast;
 
+#[tauri::command]
+pub fn check_autostart_hidden() -> bool {
+    std::env::args().any(|arg| arg == "--hidden")
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_log::Builder::default().level(log::LevelFilter::Info).build())
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
+    .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
     .setup(|app| {
         let handle = app.handle().clone();
         
@@ -43,7 +49,9 @@ pub fn run() {
         fuckingfast::ff_pause,
         fuckingfast::ff_resume,
         fuckingfast::ff_remove,
-        fuckingfast::ff_get_tasks
+        fuckingfast::ff_get_tasks,
+        fuckingfast::set_download_speed_limit,
+        check_autostart_hidden
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

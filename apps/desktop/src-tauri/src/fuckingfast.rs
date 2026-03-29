@@ -8,7 +8,7 @@ use tokio::io::AsyncWriteExt;
 use std::time::{Instant, Duration};
 use futures_util::StreamExt;
 use regex::Regex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use unrar::Archive;
 
 #[derive(Clone, serde::Serialize)]
@@ -46,6 +46,7 @@ pub struct FuckingFastState {
     pub tasks: Arc<Mutex<HashMap<String, FFTask>>>,
     pub client: Client,
     pub download_dir: PathBuf,
+    pub speed_limit_kb: Arc<AtomicU64>,
 }
 
 impl FuckingFastState {
@@ -57,6 +58,7 @@ impl FuckingFastState {
             tasks: Arc::new(Mutex::new(HashMap::new())),
             client: Client::builder().default_headers(headers).build().unwrap(),
             download_dir,
+            speed_limit_kb: Arc::new(AtomicU64::new(0)),
         }
     }
 }
@@ -66,6 +68,7 @@ pub async fn start_download(
     download_dir: PathBuf,
     client: Client,
     tasks: Arc<Mutex<HashMap<String, FFTask>>>,
+    speed_limit_kb: Arc<AtomicU64>,
 ) {
     let mut initial_file = None;
     let mut root_dir = None;
@@ -180,6 +183,14 @@ pub async fn start_download(
                             bytes_since_last_update = 0;
                             last_update = Instant::now();
                         }
+                    }
+
+                    // Throttle block
+                    let limit_kbps = speed_limit_kb.load(Ordering::Relaxed);
+                    if limit_kbps > 0 {
+                        let bytes_per_sec = limit_kbps * 1024;
+                        let expected_secs = (len as f64) / (bytes_per_sec as f64);
+                        tokio::time::sleep(Duration::from_secs_f64(expected_secs)).await;
                     }
                 }
             }
@@ -323,8 +334,9 @@ pub async fn ff_add_urls(id: String, game_slug: String, urls: Vec<String>, downl
     let t = state.tasks.clone();
     let c = state.client.clone();
     let d = state.download_dir.clone();
+    let s = state.speed_limit_kb.clone();
     tokio::spawn(async move {
-        start_download(id, d, c, t).await;
+        start_download(id, d, c, t, s).await;
     });
 
     Ok(true)
@@ -352,10 +364,11 @@ pub async fn ff_resume(id: String, state: State<'_, FuckingFastState>) -> Result
             let t_clone = state.tasks.clone();
             let c_clone = state.client.clone();
             let d_clone = state.download_dir.clone();
+            let s_clone = state.speed_limit_kb.clone();
             let safe_id = id.clone();
             
             tokio::spawn(async move {
-                start_download(safe_id, d_clone, c_clone, t_clone).await;
+                start_download(safe_id, d_clone, c_clone, t_clone, s_clone).await;
             });
         }
     }
@@ -451,4 +464,10 @@ pub async fn ff_get_tasks(state: State<'_, FuckingFastState>) -> Result<Vec<FFTa
     }
 
     Ok(result)
+}
+
+#[tauri::command]
+pub async fn set_download_speed_limit(limit_kbps: u64, state: State<'_, FuckingFastState>) -> Result<(), String> {
+    state.speed_limit_kb.store(limit_kbps, std::sync::atomic::Ordering::SeqCst);
+    Ok(())
 }

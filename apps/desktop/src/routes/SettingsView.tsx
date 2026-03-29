@@ -1,6 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Switch } from "@/components/ui/switch";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useEffect, useState } from "react";
 import { appDataDir, join } from "@tauri-apps/api/path";
@@ -9,7 +10,13 @@ import { HardDrive, Network, RotateCcw, FolderOpen } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 
 export default function SettingsView() {
-  const { qbUrl, qbUsername, qbPassword, setQbConfig, downloadPath, setDownloadPath } = useSettingsStore();
+  const { 
+    qbUrl, qbUsername, qbPassword, setQbConfig, 
+    downloadPath, setDownloadPath,
+    startWithWindows, setStartWithWindows,
+    hideOnStartup, setHideOnStartup,
+    downloadSpeedLimit, setDownloadSpeedLimit
+  } = useSettingsStore();
 
   const [displayPath, setDisplayPath] = useState(downloadPath || "Loading...");
   
@@ -73,6 +80,33 @@ export default function SettingsView() {
       </header>
       
       <div className="p-8 max-w-4xl space-y-12 pb-24 mx-auto w-full">
+
+        {/* System Autostart */}
+        <section className="space-y-4">
+          <div className="flex items-center space-x-2 border-b border-border/50 pb-2 mb-4">
+             <RotateCcw className="h-5 w-5 text-primary" />
+             <h3 className="text-lg font-semibold tracking-tight">System Behavior</h3>
+          </div>
+          <p className="text-sm text-muted-foreground mr-10 leading-relaxed max-w-2xl">
+            Configure how the Manager behaves when your operating system starts.
+          </p>
+          <div className="flex flex-col space-y-4 bg-card p-6 rounded-xl border border-border shadow-sm max-w-2xl">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <h4 className="text-base font-semibold">Start with System</h4>
+                <p className="text-sm text-muted-foreground">Automatically launch the application on startup.</p>
+              </div>
+              <Switch checked={startWithWindows} onCheckedChange={setStartWithWindows} />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <h4 className="text-base font-semibold">Hide on Startup</h4>
+                <p className="text-sm text-muted-foreground">Keep the window hidden to the system tray when auto-starting.</p>
+              </div>
+              <Switch checked={hideOnStartup} onCheckedChange={setHideOnStartup} disabled={!startWithWindows} />
+            </div>
+          </div>
+        </section>
         
         {/* Storage Configuration */}
         <section className="space-y-4">
@@ -92,6 +126,20 @@ export default function SettingsView() {
             <Button variant="outline" className="shrink-0 group relative overflow-hidden" onClick={openFolder}>
                 <span className="relative z-10 transition-colors">Change Path</span>
             </Button>
+          </div>
+          
+          <div className="mt-6 border-t border-border/50 pt-4 max-w-2xl space-y-4">
+            <div className="space-y-1.5 w-full sm:w-1/2">
+              <label className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest pl-1">Download Speed Limit (KB/s)</label>
+              <Input 
+                type="number" 
+                value={downloadSpeedLimit || ""} 
+                onChange={(e) => setDownloadSpeedLimit(Number(e.target.value) || 0)} 
+                placeholder="0 (Unlimited)" 
+                className="bg-background shadow-xs w-full transition-all focus-within:ring-primary/50" 
+              />
+              <p className="text-xs text-muted-foreground pl-1 pt-1">Set to 0 for unlimited bandwidth.</p>
+            </div>
           </div>
         </section>
 

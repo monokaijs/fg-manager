@@ -6,7 +6,9 @@ import { Toaster, toast } from "sonner";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { check } from "@tauri-apps/plugin-updater";
 import { useGamesStore } from "@/store/useGamesStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { formatBytes } from "@/lib/utils";
+import { invoke } from "@tauri-apps/api/core";
 
 import GamesCatalog from "@/routes/GamesCatalog";
 import GameDetailView from "@/routes/GameDetailView";
@@ -19,6 +21,17 @@ export default function App() {
 
   useEffect(() => {
     initDB();
+
+    // Autostart logic
+    invoke<boolean>("check_autostart_hidden").then((isHiddenArg) => {
+        const { hideOnStartup, downloadSpeedLimit } = useSettingsStore.getState();
+        // Sync download limit
+        invoke('set_download_speed_limit', { limitKbps: downloadSpeedLimit }).catch(console.error);
+
+        if (isHiddenArg && hideOnStartup) {
+             getCurrentWindow().hide();
+        }
+    });
 
     // Check for Updates automatically
     check().then(async (update) => {
