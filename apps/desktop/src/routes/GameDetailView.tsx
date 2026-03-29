@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { AlertCircle, ArrowLeft, Download, HardDrive, Star, Magnet, Copy, ChevronDown, FileArchive, Play, Pause, Trash } from "lucide-react";
+import { AlertCircle, ArrowLeft, Download, HardDrive, Star, Magnet, Copy, ChevronDown, FileArchive, Play, Pause, Trash, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useGamesStore } from "@/store/useGamesStore";
 import { useDownloadStore } from "@/stores/downloadStore";
@@ -17,6 +17,7 @@ export default function GameDetailView() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedMediaUrl, setSelectedMediaUrl] = useState<string | null>(null);
+  const [processingDownload, setProcessingDownload] = useState<boolean>(false);
 
   useEffect(() => {
     fetch(`https://games-cdn.xomnghien.com/posts/${slug}.json`)
@@ -156,18 +157,24 @@ export default function GameDetailView() {
 
                 return hasOptions ? (
                   <DropdownMenu>
-                    <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 py-5 h-auto cursor-pointer">
-                      <Download className="w-4 h-4 mr-2" /> Download <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                    <DropdownMenuTrigger disabled={processingDownload} className="inline-flex items-center justify-center whitespace-nowrap rounded-md transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-6 py-5 h-auto cursor-pointer">
+                      {processingDownload ? (
+                        <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Starting...</>
+                      ) : (
+                        <><Download className="w-4 h-4 mr-2" /> Download <ChevronDown className="w-4 h-4 ml-2 opacity-50" /></>
+                      )}
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-64 border-border shadow-xl">
                       {magnetLink && (
                         <DropdownMenuItem 
                           onClick={async () => {
+                            setProcessingDownload(true);
                             const success = await addMagnet(magnetLink, slug);
+                            setProcessingDownload(false);
                             if (success) {
-                              toast.success("Magnet Link injected directly into native torrent engine!");
+                              toast.success("Download started!");
                             } else {
-                              toast.error("Failed to initiate embedded torrent adapter!");
+                              toast.error("Failed to start download. Please check your config.");
                             }
                           }} 
                           className="cursor-pointer py-3 px-4 font-medium"
@@ -178,11 +185,13 @@ export default function GameDetailView() {
                       {torrentFile && (
                          <DropdownMenuItem 
                           onClick={async () => {
+                            setProcessingDownload(true);
                             const success = await addTorrent(torrentFile, slug);
+                            setProcessingDownload(false);
                             if (success) {
-                              toast.success("Torrent File injected directly into native torrent engine!");
+                              toast.success("Download started!");
                             } else {
-                              toast.error("Failed to initiate embedded torrent adapter!");
+                              toast.error("Failed to start download. Please check your config.");
                             }
                           }} 
                           className="cursor-pointer py-3 px-4 font-medium"
@@ -194,11 +203,13 @@ export default function GameDetailView() {
                         <DropdownMenuItem 
                           onClick={async () => {
                             if (slug) {
+                              setProcessingDownload(true);
                               const success = await addFastUrls(slug, slug, fuckingFastMirror.urls);
+                              setProcessingDownload(false);
                               if (success) {
-                                toast.success("FuckingFast multi-part urls injected into native HTTP embedded engine!");
+                                toast.success("Download started!");
                               } else {
-                                toast.error("Native HTTP downloader unavailable.");
+                                toast.error("Failed to start download. Please check your config.");
                               }
                             }
                           }} 
@@ -222,14 +233,14 @@ export default function GameDetailView() {
 
           {/* Active Download Embedded Progress */}
           {activeTask && (
-            <div className="w-full mb-8 bg-card rounded-xl p-5 border border-border shadow-sm">
+            <div className={`w-full mb-8 rounded-xl p-5 border shadow-sm ${activeTask.status === 'extracting' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-card border-border'}`}>
               <div className="flex justify-between items-center mb-3">
-                <h4 className="text-sm font-semibold tracking-tight text-primary capitalize flex items-center gap-2">
-                   Downloading: {activeTask.status}
+                <h4 className={`text-sm font-semibold tracking-tight capitalize flex items-center gap-2 ${activeTask.status === 'extracting' ? 'text-amber-500' : 'text-primary'}`}>
+                   {activeTask.status === 'extracting' ? 'Extracting Archive: Do Not Turn Off' : `Downloading: ${activeTask.status}`}
                 </h4>
                 <span className="text-xs font-medium text-muted-foreground">{Math.round(activeTask.progress * 100)}%</span>
               </div>
-              <Progress value={activeTask.progress * 100} className="h-1.5 mb-3" />
+              <Progress value={activeTask.progress * 100} className={`h-1.5 mb-3 ${activeTask.status === 'extracting' ? 'bg-amber-500/20 [&>div]:bg-amber-500' : ''}`} />
               <div className="flex justify-between items-end">
                  <div className="flex flex-col gap-1 text-xs text-muted-foreground">
                    <span>{formatBytes(activeTask.downloaded)} / {formatBytes(activeTask.totalSize)}</span>
@@ -317,13 +328,13 @@ export default function GameDetailView() {
                             if (t.type === 'magnet' || t.url?.startsWith('magnet:')) {
                               e.preventDefault();
                               const success = await addMagnet(t.url, slug);
-                              if (success) toast.success("Magnet Link injected into Download Manager!");
-                              else toast.error("Native Downloader Adapter unavailable.");
+                              if (success) toast.success("Download started!");
+                              else toast.error("Failed to start download.");
                             } else if (t.type?.toLowerCase().includes('torrent') && !t.type?.toLowerCase().includes('magnet')) {
                               e.preventDefault();
                               const success = await addTorrent(t.url, slug);
-                              if (success) toast.success("Torrent File injected into Download Manager!");
-                              else toast.error("Native Downloader Adapter unavailable.");
+                              if (success) toast.success("Download started!");
+                              else toast.error("Failed to start download.");
                             }
                           }}
                           className="flex-1 text-primary hover:text-primary/80 transition-colors text-sm font-medium flex items-center capitalize truncate"

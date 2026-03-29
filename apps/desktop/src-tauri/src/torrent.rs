@@ -9,6 +9,7 @@ pub struct TorrentState {
     pub session: Arc<Session>,
     pub slugs: Arc<Mutex<HashMap<String, String>>>, // info_hash -> game_slug
     pub slugs_path: PathBuf,
+    pub download_dir: PathBuf,
 }
 
 impl TorrentState {
@@ -26,7 +27,7 @@ impl TorrentState {
             fastresume: true,
             ..Default::default()
         };
-        let session = Session::new_with_opts(download_dir, opts).await.map_err(|e| e.to_string())?;
+        let session = Session::new_with_opts(download_dir.clone(), opts).await.map_err(|e| e.to_string())?;
         
         let slugs_path = config_dir.join("fg_slugs.json");
         let mut slugs = HashMap::new();
@@ -40,6 +41,7 @@ impl TorrentState {
             session,
             slugs: Arc::new(Mutex::new(slugs)),
             slugs_path,
+            download_dir: download_dir.clone(),
         })
     }
     
@@ -57,9 +59,15 @@ pub async fn torrent_ping(_state: State<'_, TorrentState>) -> Result<String, Str
 }
 
 #[tauri::command]
-pub async fn torrent_add_magnet(magnet: String, game_slug: Option<String>, state: State<'_, TorrentState>) -> Result<String, String> {
+pub async fn torrent_add_magnet(magnet: String, game_slug: Option<String>, download_dir: Option<String>, state: State<'_, TorrentState>) -> Result<String, String> {
+    let output_folder = download_dir.clone().map(PathBuf::from).unwrap_or(state.download_dir.clone());
+    let opts = librqbit::AddTorrentOptions {
+        output_folder: Some(output_folder.to_string_lossy().to_string()),
+        ..Default::default()
+    };
+    
     let response = state.session
-        .add_torrent(AddTorrent::from_url(&magnet), None)
+        .add_torrent(AddTorrent::from_url(&magnet), Some(opts))
         .await
         .map_err(|e| format!("Failed to add magnet: {}", e))?;
 
@@ -77,9 +85,15 @@ pub async fn torrent_add_magnet(magnet: String, game_slug: Option<String>, state
 }
 
 #[tauri::command]
-pub async fn torrent_add_url(url: String, game_slug: Option<String>, state: State<'_, TorrentState>) -> Result<String, String> {
+pub async fn torrent_add_url(url: String, game_slug: Option<String>, download_dir: Option<String>, state: State<'_, TorrentState>) -> Result<String, String> {
+    let output_folder = download_dir.clone().map(PathBuf::from).unwrap_or(state.download_dir.clone());
+    let opts = librqbit::AddTorrentOptions {
+        output_folder: Some(output_folder.to_string_lossy().to_string()),
+        ..Default::default()
+    };
+    
     let response = state.session
-        .add_torrent(AddTorrent::from_url(&url), None)
+        .add_torrent(AddTorrent::from_url(&url), Some(opts))
         .await
         .map_err(|e| format!("Failed to add torrent URL: {}", e))?;
 

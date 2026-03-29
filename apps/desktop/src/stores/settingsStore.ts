@@ -6,6 +6,8 @@ interface SettingsState {
   qbUsername: string;
   qbPassword: string;
   setQbConfig: (url: string, user: string, pass: string) => void;
+  downloadPath: string | null;
+  setDownloadPath: (path: string) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -15,6 +17,8 @@ export const useSettingsStore = create<SettingsState>()(
       qbUsername: '',
       qbPassword: '',
       setQbConfig: (url, user, pass) => set({ qbUrl: url, qbUsername: user, qbPassword: pass }),
+      downloadPath: null,
+      setDownloadPath: (path) => set({ downloadPath: path }),
     }),
     {
       name: 'fg-manager-settings',

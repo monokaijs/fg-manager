@@ -2,7 +2,7 @@ export interface DownloadTask {
   id: string; 
   gameSlug?: string;
   name: string;
-  status: 'downloading' | 'paused' | 'completed' | 'error' | 'checking' | 'queued' | 'stalled';
+  status: 'downloading' | 'paused' | 'completed' | 'error' | 'checking' | 'queued' | 'stalled' | 'extracting';
   progress: number; // 0 to 1
   downloadSpeed: number; // bytes/sec
   uploadSpeed: number; // bytes/sec

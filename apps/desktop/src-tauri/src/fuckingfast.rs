@@ -9,6 +9,7 @@ use std::time::{Instant, Duration};
 use futures_util::StreamExt;
 use regex::Regex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use unrar::Archive;
 
 #[derive(Clone, serde::Serialize)]
 pub struct FFTaskStats {
@@ -35,6 +36,8 @@ pub struct FFTask {
     pub progress_bytes: u64,
     pub download_speed: u64,
     pub token: Arc<AtomicBool>,
+    pub custom_dir: Option<PathBuf>,
+    pub extracting_progress: f64,
 }
 
 pub struct FuckingFastState {
@@ -62,29 +65,33 @@ pub async fn start_download(
     client: Client,
     tasks: Arc<Mutex<HashMap<String, FFTask>>>,
 ) {
-    loop {
-        let (url, cancel_token, mut file_path) = {
+    let mut initial_file = None;
+    let mut root_dir = None;
+
+    'dl: loop {
+        let (url, cancel_token, mut file_path, current_idx, _total_parts) = {
             let mut t = tasks.lock().await;
             let task = match t.get_mut(&id) {
                 Some(t) => t,
                 None => return,
             };
-            if task.current_part_idx >= task.urls.len() {
-                task.status = "completed".to_string();
-                task.download_speed = 0;
-                task.current_part_bytes = task.current_part_total;
+            if task.status == "paused" || task.status == "error" || task.status == "extracting" {
                 return;
             }
-            if task.status == "paused" {
-                return;
+            if task.current_part_idx >= task.urls.len() {
+                task.status = "extracting".to_string();
+                task.download_speed = 0;
+                task.current_part_bytes = task.current_part_total;
+                break 'dl;
             }
             task.status = "downloading".to_string();
             let target_url = task.urls[task.current_part_idx].clone();
             
-            let parent_folder = download_dir.join(&task.game_slug);
+            let base_dir = task.custom_dir.clone().unwrap_or(download_dir.clone());
+            let parent_folder = base_dir.join(&task.game_slug);
             let _ = std::fs::create_dir_all(&parent_folder);
             
-            (target_url, task.token.clone(), parent_folder)
+            (target_url, task.token.clone(), parent_folder, task.current_part_idx, task.urls.len())
         };
 
         // Fetch page to extract direct URL
@@ -110,6 +117,11 @@ pub async fn start_download(
         // Use filename from url
         let file_name = direct_url.split('/').last().unwrap_or("unknown_file.bin");
         file_path = file_path.join(file_name);
+        
+        if current_idx == 0 {
+            initial_file = Some(file_path.clone());
+            root_dir = Some(file_path.parent().unwrap().to_path_buf());
+        }
 
         let resp = match client.get(&direct_url).send().await {
             Ok(r) => r,
@@ -180,11 +192,49 @@ pub async fn start_download(
             }
         }
     }
+    
+    // Auto-Extraction Phase
+    if let (Some(archive_path), Some(extract_to)) = (initial_file, root_dir) {
+        if let Ok(path_str) = archive_path.into_os_string().into_string() {
+            if path_str.to_lowercase().ends_with(".rar") {
+                {
+                    let mut t = tasks.lock().await;
+                    if let Some(task) = t.get_mut(&id) {
+                        task.status = "extracting".to_string();
+                        task.extracting_progress = 0.5; // Simulate progress as unrar crate is synchronous
+                    }
+                }
+                
+                let dest = extract_to.clone();
+                let _ = tokio::task::spawn_blocking(move || {
+                    if let Ok(mut archive) = Archive::new(&path_str).open_for_processing() {
+                        while let Ok(Some(header)) = archive.read_header() {
+                            if let Ok(next_archive) = header.extract_to(&dest) {
+                                archive = next_archive;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+                }).await;
+            }
+        }
+    }
+    
+    // Mark as completed
+    {
+        let mut t = tasks.lock().await;
+        if let Some(task) = t.get_mut(&id) {
+            task.status = "completed".to_string();
+            task.extracting_progress = 1.0;
+        }
+    }
 }
 
 #[tauri::command]
-pub async fn ff_add_urls(id: String, game_slug: String, urls: Vec<String>, state: State<'_, FuckingFastState>) -> Result<bool, String> {
+pub async fn ff_add_urls(id: String, game_slug: String, urls: Vec<String>, download_dir: Option<String>, state: State<'_, FuckingFastState>) -> Result<bool, String> {
     let token = Arc::new(AtomicBool::new(false));
+    let custom_dir = download_dir.clone().map(PathBuf::from);
     {
         let mut tasks = state.tasks.lock().await;
         tasks.insert(id.clone(), FFTask {
@@ -199,6 +249,8 @@ pub async fn ff_add_urls(id: String, game_slug: String, urls: Vec<String>, state
             progress_bytes: 0,
             download_speed: 0,
             token: token.clone(),
+            custom_dir,
+            extracting_progress: 0.0,
         });
     }
 
@@ -227,7 +279,7 @@ pub async fn ff_pause(id: String, state: State<'_, FuckingFastState>) -> Result<
 pub async fn ff_resume(id: String, state: State<'_, FuckingFastState>) -> Result<(), String> {
     let mut t = state.tasks.lock().await;
     if let Some(task) = t.get_mut(&id) {
-        if task.status == "paused" {
+        if task.status == "paused" || task.status == "error" || task.status == "extracting" {
             task.token = Arc::new(AtomicBool::new(false));
             task.status = "queued".to_string();
             
@@ -247,19 +299,23 @@ pub async fn ff_resume(id: String, state: State<'_, FuckingFastState>) -> Result
 #[tauri::command]
 pub async fn ff_remove(id: String, delete_files: bool, state: State<'_, FuckingFastState>) -> Result<(), String> {
     let mut slug_to_delete = None;
+    let mut base_dir = state.download_dir.clone();
     {
         let mut tasks = state.tasks.lock().await;
         if let Some(task) = tasks.get(&id) {
             task.token.store(true, Ordering::SeqCst);
             if delete_files {
                 slug_to_delete = Some(task.game_slug.clone());
+                if let Some(ref custom) = task.custom_dir {
+                    base_dir = custom.clone();
+                }
             }
         }
         tasks.remove(&id);
     }
     
     if let Some(slug) = slug_to_delete {
-        let parent_folder = state.download_dir.join(&slug);
+        let parent_folder = base_dir.join(&slug);
         let _ = tokio::fs::remove_dir_all(parent_folder).await;
     }
     
@@ -285,6 +341,10 @@ pub async fn ff_get_tasks(state: State<'_, FuckingFastState>) -> Result<Vec<FFTa
             if progress > 1.0 { progress = 1.0; }
         }
 
+        if task.status == "extracting" {
+            progress = task.extracting_progress;
+        }
+        
         let mut estimated_total_size = task.total_bytes;
         if task.download_speed > 0 || task.total_bytes > 0 {
             // Rough ETA based on remaining parts size assuming homogenous sizing

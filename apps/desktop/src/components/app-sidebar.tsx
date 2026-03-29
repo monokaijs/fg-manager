@@ -1,10 +1,10 @@
 import * as React from "react"
-import { Search, Library, Gamepad2, Download, Settings } from "lucide-react"
+import { Search, Library, Download, Settings } from "lucide-react"
 import { useLocation } from "react-router-dom"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { useDownloadStore } from "@/stores/downloadStore"
 import { NavMain } from "@/components/nav-main"
-import { NavUser } from "@/components/nav-user"
+import { Link } from "react-router-dom"
 import {
   Sidebar,
   SidebarContent,
@@ -24,11 +24,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const activeDownloads = tasks.filter(t => typeof t.progress === 'number' && t.progress < 1).length;
 
   const data = {
-    user: {
-      name: "Player One",
-      email: "local@fgmanager",
-      avatar: "",
-    },
     navMain: [
       { 
         title: "Games Catalog", 
@@ -56,12 +51,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             {activeDownloads}
           </span>
         ) : undefined,
-      },
-      { 
-        title: "Settings", 
-        url: "/settings", 
-        icon: Settings,
-        isActive: location.pathname === "/settings",
       },
     ],
   }
@@ -95,7 +84,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       
       <SidebarFooter>
-        <NavUser user={data.user} />
+         <SidebarMenu>
+          <SidebarMenuItem>
+            <Link to="/settings" className="flex items-center gap-2 w-full">
+              <SidebarMenuButton tooltip="Settings" isActive={location.pathname === "/settings"}>
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
+              </SidebarMenuButton>
+            </Link>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

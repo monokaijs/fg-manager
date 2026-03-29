@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { DownloaderAdapter, DownloadTask } from '../types';
+import { useSettingsStore } from '../../../stores/settingsStore';
 
 export class FuckingFastAdapter implements DownloaderAdapter {
   id = 'fuckingfast';
@@ -24,7 +25,8 @@ export class FuckingFastAdapter implements DownloaderAdapter {
 
   async addUrls(id: string, gameSlug: string, urls: string[]): Promise<boolean> {
     try {
-      return await invoke<boolean>('ff_add_urls', { id, gameSlug, urls });
+      const { downloadPath } = useSettingsStore.getState();
+      return await invoke<boolean>('ff_add_urls', { id, gameSlug, urls, downloadDir: downloadPath });
     } catch (e) {
       console.error("Failed to add fast URLs", e);
       return false;

@@ -6,6 +6,7 @@ mod fuckingfast;
 pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_log::Builder::default().level(log::LevelFilter::Info).build())
+    .plugin(tauri_plugin_dialog::init())
     .setup(|app| {
         let handle = app.handle().clone();
         

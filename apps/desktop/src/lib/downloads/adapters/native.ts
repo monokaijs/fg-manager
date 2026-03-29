@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { DownloaderAdapter, DownloadTask } from '../types';
+import { useSettingsStore } from '../../../stores/settingsStore';
 
 export class NativeAdapter implements DownloaderAdapter {
   id = 'native';
@@ -21,7 +22,8 @@ export class NativeAdapter implements DownloaderAdapter {
 
   async addMagnet(magnet: string, gameSlug?: string): Promise<boolean> {
     try {
-      await invoke('torrent_add_magnet', { magnet, gameSlug });
+      const { downloadPath } = useSettingsStore.getState();
+      await invoke('torrent_add_magnet', { magnet, gameSlug, downloadDir: downloadPath });
       return true;
     } catch (e) {
       console.error("Native adapter addMagnet error:", e);
@@ -31,7 +33,8 @@ export class NativeAdapter implements DownloaderAdapter {
 
   async addTorrent(torrentUrl: string, gameSlug?: string): Promise<boolean> {
     try {
-      await invoke('torrent_add_url', { url: torrentUrl, gameSlug });
+      const { downloadPath } = useSettingsStore.getState();
+      await invoke('torrent_add_url', { url: torrentUrl, gameSlug, downloadDir: downloadPath });
       return true;
     } catch {
       return false;
