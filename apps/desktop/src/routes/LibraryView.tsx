@@ -22,7 +22,7 @@ export default function LibraryView() {
     <>
       <header
         data-tauri-drag-region
-        className="flex h-16 shrink-0 items-center px-8 border-b border-border bg-background/95 backdrop-blur z-50 sticky top-0 transition-[padding] duration-200"
+        className="flex h-16 shrink-0 items-center px-8 border-b border-border bg-background z-50 sticky top-0 transition-[padding] duration-200"
       >
         <SidebarTrigger className="mr-4" />
         <h2 className="text-lg font-semibold tracking-tight">My Library</h2>

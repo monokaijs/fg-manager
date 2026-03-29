@@ -40,7 +40,7 @@ export const GameCard = React.memo(function GameCard({ game, viewMode = "grid", 
   return (
     <Link to={`/games/view/${game.slug}`} className="group relative aspect-[3/4] rounded-xl bg-muted/30 border border-border/50 overflow-hidden transition-all hover:shadow-xl hover:shadow-primary/5 cursor-pointer flex flex-col">
       {game.postImage ? (
-        <img loading="lazy" decoding="async" src={game.postImage} alt={decodedTitle} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <img loading="lazy" decoding="async" src={game.postImage} alt={decodedTitle} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 will-change-transform transform-gpu" />
       ) : (
         <div className="absolute inset-0 bg-muted flex items-center justify-center">No Image</div>
       )}

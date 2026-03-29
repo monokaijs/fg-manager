@@ -43,7 +43,7 @@ export default function GamesCatalog({ filter }: { filter?: "favorites" | "recen
     <>
       <header
         data-tauri-drag-region
-        className="flex h-16 shrink-0 items-center justify-between px-8 border-b border-border bg-background/95 backdrop-blur z-50 sticky top-0 transition-[padding] duration-200"
+        className="flex h-16 shrink-0 items-center justify-between px-8 border-b border-border bg-background z-50 sticky top-0 transition-[padding] duration-200"
       >
         <div className="flex items-center space-x-4">
           <SidebarTrigger />
