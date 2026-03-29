@@ -295,38 +295,50 @@ pub async fn start_download(
                         }
                     }
 
-                    // Extract install_script.iss
-                    let _ = std::process::Command::new("innoextract")
-                        .arg("--extract")
-                        .arg("install_script.iss")
-                        .arg(&setup_path)
-                        .current_dir(&extract_to)
-                        .output();
-
-                    let iss_path = extract_to.join("install_script.iss");
-                    if let Ok(script_content) = std::fs::read_to_string(&iss_path) {
-                        for line in script_content.lines() {
-                            if line.contains("Filename: \"{app}\\") && line.contains(".exe\"") {
-                                if let Some(start) = line.find("\"{app}\\") {
-                                    if let Some(end) = line[start + 7..].find('\"') {
-                                        let exe = &line[start + 7..start + 7 + end];
-                                        let full_exe = extract_to.join(exe.replace("\\", "/"));
-                                        
-                                        // Persist target executable for the UI layout
-                                        let target_exe = exe.replace("\\", "/");
-                                        let _ = std::fs::write(
-                                            extract_to.join("fg_setup_meta.json"),
-                                            serde_json::json!({ "target_executable": target_exe }).to_string()
-                                        );
-
-                                        let mut t = tasks.lock().await;
-                                        if let Some(task) = t.get_mut(&id) {
-                                            task.executable_path = Some(full_exe.to_string_lossy().to_string());
+                    let mut extracted_exe = None;
+                    if let Ok(bytes) = std::fs::read(&setup_path) {
+                        let mut ascii = Vec::with_capacity(bytes.len() / 2);
+                        for &b in &bytes {
+                            if b >= 32 && b <= 126 {
+                                ascii.push(b);
+                            }
+                        }
+                        if let Ok(text) = String::from_utf8(ascii) {
+                            let mut offset = 0;
+                            while let Some(start) = text[offset..].find("{app}\\") {
+                                let slice = &text[offset + start + 6 ..];
+                                if let Some(end) = slice.find(".exe") {
+                                    let maybe_exe = &slice[..end + 4];
+                                    let lower = maybe_exe.to_lowercase();
+                                    if lower.len() < 100 
+                                       && !lower.contains("dxwebsetup") 
+                                       && !lower.contains("vcredist") 
+                                       && !lower.contains("unins") 
+                                       && !lower.contains("quicksfv") 
+                                       && !lower.contains("md5") 
+                                    {
+                                        if !maybe_exe.contains("{") && !maybe_exe.contains("\"") && !maybe_exe.contains("?") && !maybe_exe.contains(">") {
+                                            extracted_exe = Some(maybe_exe.to_string());
+                                            break;
                                         }
-                                        break; // Found it
                                     }
                                 }
+                                offset += start + 6;
                             }
+                        }
+                    }
+
+                    if let Some(exe) = extracted_exe {
+                        let target_exe = exe.replace("\\", "/");
+                        let full_exe = extract_to.join(&target_exe);
+                        let _ = std::fs::write(
+                            extract_to.join("fg_setup_meta.json"),
+                            serde_json::json!({ "target_executable": target_exe }).to_string()
+                        );
+
+                        let mut t = tasks.lock().await;
+                        if let Some(task) = t.get_mut(&id) {
+                            task.executable_path = Some(full_exe.to_string_lossy().to_string());
                         }
                     }
 

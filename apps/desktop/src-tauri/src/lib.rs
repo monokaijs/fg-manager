@@ -140,54 +140,44 @@ pub mod cmds {
             None => return Ok(()),
         };
 
-        let innoextract_dir = config_dir.join("bin");
-        let _ = std::fs::create_dir_all(&innoextract_dir);
-        let innoextract_exe = innoextract_dir.join("innoextract.exe");
-
-        if !innoextract_exe.exists() {
-            let script = format!(
-                "$url = 'https://github.com/dscharrer/innoextract/releases/download/1.9/innoextract-1.9-windows.zip'; \
-                 $zip = '{}\\inno.zip'; \
-                 Invoke-WebRequest -Uri $url -OutFile $zip; \
-                 Expand-Archive -Path $zip -DestinationPath '{}' -Force; \
-                 Remove-Item $zip",
-                 innoextract_dir.display(), innoextract_dir.display()
-            );
-            let _ = std::process::Command::new("powershell")
-                .arg("-NoProfile").arg("-WindowStyle").arg("Hidden")
-                .arg("-Command").arg(&script)
-                .output();
-        }
-
-        if innoextract_exe.exists() {
-            let _ = std::process::Command::new(&innoextract_exe)
-                .arg("--extract").arg("install_script.iss").arg(&setup_path)
-                .current_dir(&game_dir).output();
-
-            let iss_path = game_dir.join("app").join("install_script.iss");
-            let mut extracted_exe = None;
-            
-            if let Ok(script) = std::fs::read_to_string(&iss_path) {
-                for line in script.lines() {
-                    if line.contains("Filename: \"{app}\\") && line.contains(".exe\"") {
-                        if let Some(start) = line.find("\"{app}\\") {
-                            if let Some(end) = line[start + 7..].find('\"') {
-                                extracted_exe = Some(line[start + 7..start + 7 + end].replace("\\", "/"));
+        let mut extracted_exe = None;
+        if let Ok(bytes) = std::fs::read(&setup_path) {
+            let mut ascii = Vec::with_capacity(bytes.len() / 2);
+            for &b in &bytes {
+                if b >= 32 && b <= 126 {
+                    ascii.push(b);
+                }
+            }
+            if let Ok(text) = String::from_utf8(ascii) {
+                let mut offset = 0;
+                while let Some(start) = text[offset..].find("{app}\\") {
+                    let slice = &text[offset + start + 6 ..];
+                    if let Some(end) = slice.find(".exe") {
+                        let maybe_exe = &slice[..end + 4];
+                        let lower = maybe_exe.to_lowercase();
+                        if lower.len() < 100 
+                           && !lower.contains("dxwebsetup") 
+                           && !lower.contains("vcredist") 
+                           && !lower.contains("unins") 
+                           && !lower.contains("quicksfv") 
+                           && !lower.contains("md5") 
+                        {
+                            if !maybe_exe.contains("{") && !maybe_exe.contains("\"") && !maybe_exe.contains("?") && !maybe_exe.contains(">") {
+                                extracted_exe = Some(maybe_exe.replace("\\", "/"));
                                 break;
                             }
                         }
                     }
+                    offset += start + 6;
                 }
             }
-            
-            if let Some(t_exe) = extracted_exe {
-                let _ = std::fs::write(
-                    game_dir.join("fg_setup_meta.json"),
-                    serde_json::json!({ "target_executable": t_exe }).to_string()
-                );
-            }
-            
-            let _ = std::fs::remove_dir_all(game_dir.join("app"));
+        }
+        
+        if let Some(t_exe) = extracted_exe {
+            let _ = std::fs::write(
+                game_dir.join("fg_setup_meta.json"),
+                serde_json::json!({ "target_executable": t_exe }).to_string()
+            );
         }
 
         Ok(())
