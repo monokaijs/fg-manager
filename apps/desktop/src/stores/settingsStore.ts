@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 import { enable, disable } from '@tauri-apps/plugin-autostart';
 
 interface SettingsState {
+  language: 'en' | 'vi';
+  setLanguage: (language: 'en' | 'vi') => void;
   qbUrl: string;
   qbUsername: string;
   qbPassword: string;
@@ -22,6 +24,8 @@ interface SettingsState {
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
+      language: 'en',
+      setLanguage: (language) => set({ language }),
       qbUrl: 'http://127.0.0.1:8080',
       qbUsername: '',
       qbPassword: '',

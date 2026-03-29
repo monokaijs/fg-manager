@@ -8,7 +8,7 @@ use tokio::io::AsyncWriteExt;
 use std::time::{Instant, Duration};
 use futures_util::StreamExt;
 use regex::Regex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use unrar::Archive;
 
 #[derive(Clone, serde::Serialize)]
@@ -23,6 +23,7 @@ pub struct FFTaskStats {
     pub total_size: u64,
     pub downloaded: u64,
     pub executable_path: Option<String>,
+    pub save_path: String,
 }
 
 pub struct FFTask {
@@ -46,6 +47,7 @@ pub struct FuckingFastState {
     pub tasks: Arc<Mutex<HashMap<String, FFTask>>>,
     pub client: Client,
     pub download_dir: PathBuf,
+    pub speed_limit_kbps: Arc<AtomicU64>,
 }
 
 impl FuckingFastState {
@@ -57,6 +59,7 @@ impl FuckingFastState {
             tasks: Arc::new(Mutex::new(HashMap::new())),
             client: Client::builder().default_headers(headers).build().unwrap(),
             download_dir,
+            speed_limit_kbps: Arc::new(AtomicU64::new(0)),
         }
     }
 }
@@ -66,6 +69,7 @@ pub async fn start_download(
     download_dir: PathBuf,
     client: Client,
     tasks: Arc<Mutex<HashMap<String, FFTask>>>,
+    speed_limit_kbps: Arc<AtomicU64>,
 ) {
     let mut initial_file = None;
     let mut root_dir = None;
@@ -180,6 +184,8 @@ pub async fn start_download(
         let mut bytes_since_last_update = 0u64;
         let mut local_progress = 0u64;
         let mut local_part = 0u64;
+        let mut throttle_window_start = Instant::now();
+        let mut bytes_in_window = 0u64;
 
         while let Some(chunk_res) = stream.next().await {
             if cancel_token.load(Ordering::SeqCst) {
@@ -194,6 +200,22 @@ pub async fn start_download(
                     bytes_since_last_update += len;
                     local_progress += len;
                     local_part += len;
+                    bytes_in_window += len;
+
+                    let limit_kbps = speed_limit_kbps.load(Ordering::Relaxed);
+                    if limit_kbps > 0 {
+                        let limit_bps = limit_kbps.saturating_mul(1024);
+                        let elapsed = throttle_window_start.elapsed();
+
+                        if elapsed >= Duration::from_secs(1) {
+                            throttle_window_start = Instant::now();
+                            bytes_in_window = 0;
+                        } else if bytes_in_window >= limit_bps {
+                            tokio::time::sleep(Duration::from_secs(1).saturating_sub(elapsed)).await;
+                            throttle_window_start = Instant::now();
+                            bytes_in_window = 0;
+                        }
+                    }
 
                     // Only lock the mutex every 500ms to avoid contention with ff_get_tasks
                     if last_update.elapsed() > Duration::from_millis(500) {
@@ -388,8 +410,9 @@ pub async fn ff_add_urls(id: String, game_slug: String, urls: Vec<String>, downl
     let t = state.tasks.clone();
     let c = state.client.clone();
     let d = state.download_dir.clone();
+    let s = state.speed_limit_kbps.clone();
     tokio::spawn(async move {
-        start_download(id, d, c, t).await;
+        start_download(id, d, c, t, s).await;
     });
 
     Ok(true)
@@ -417,13 +440,20 @@ pub async fn ff_resume(id: String, state: State<'_, FuckingFastState>) -> Result
             let t_clone = state.tasks.clone();
             let c_clone = state.client.clone();
             let d_clone = state.download_dir.clone();
+            let s_clone = state.speed_limit_kbps.clone();
             let safe_id = id.clone();
             
             tokio::spawn(async move {
-                start_download(safe_id, d_clone, c_clone, t_clone).await;
+                start_download(safe_id, d_clone, c_clone, t_clone, s_clone).await;
             });
         }
     }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn ff_set_speed_limit(limit_kbps: u64, state: State<'_, FuckingFastState>) -> Result<(), String> {
+    state.speed_limit_kbps.store(limit_kbps, Ordering::Relaxed);
     Ok(())
 }
 
@@ -512,6 +542,13 @@ pub async fn ff_get_tasks(state: State<'_, FuckingFastState>) -> Result<Vec<FFTa
             total_size: estimated_total_size,
             downloaded: task.progress_bytes,
             executable_path: task.executable_path.clone(),
+            save_path: task
+                .custom_dir
+                .clone()
+                .unwrap_or_else(|| state.download_dir.clone())
+                .join(&task.game_slug)
+                .to_string_lossy()
+                .to_string(),
         });
     }
 

@@ -20,6 +20,7 @@ import {
 
 export function NavMain({
   items,
+  groupLabel,
 }: {
   items: {
     title: string
@@ -32,12 +33,13 @@ export function NavMain({
       url: string
     }[]
   }[]
+  groupLabel?: string
 }) {
   const location = useLocation()
 
   return (
     <SidebarGroup>
-      <SidebarGroupLabel>Platform</SidebarGroupLabel>
+      <SidebarGroupLabel>{groupLabel ?? 'Platform'}</SidebarGroupLabel>
       <SidebarMenu>
         {items.map((item) => (
           <Collapsible

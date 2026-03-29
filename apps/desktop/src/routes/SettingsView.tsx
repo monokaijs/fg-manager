@@ -10,9 +10,12 @@ import { HardDrive, Network, RotateCcw, FolderOpen } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { getVersion } from "@tauri-apps/api/app";
 import { check } from "@tauri-apps/plugin-updater";
+import { useI18n } from "@/i18n/useI18n";
 
 export default function SettingsView() {
+  const { t } = useI18n();
   const { 
+    language, setLanguage,
     qbUrl, qbUsername, qbPassword, setQbConfig, 
     downloadPath, setDownloadPath,
     startWithWindows, setStartWithWindows,
@@ -86,10 +89,10 @@ export default function SettingsView() {
           
           if (selectedDirPath) {
               setDownloadPath(selectedDirPath as string);
-              toast.success(`Download path updated to ${selectedDirPath}`);
+              toast.success(t('settings.savePathUpdated', { path: selectedDirPath as string }));
           }
       } catch (e) {
-          toast.error("Failed to open dialog or set path");
+            toast.error(t('settings.pathUpdateFailed'));
       }
   };
 
@@ -99,7 +102,7 @@ export default function SettingsView() {
         className="flex h-16 shrink-0 items-center px-8 border-b border-border bg-background z-50 relative"
       >
         <SidebarTrigger className="mr-4" />
-        <h2 className="text-lg font-semibold tracking-tight">System Settings</h2>
+        <h2 className="text-lg font-semibold tracking-tight">{t('settings.systemSettings')}</h2>
       </header>
       
       <div className="flex-1 overflow-y-auto p-8 w-full" style={{ willChange: 'scroll-position', transform: 'translateZ(0)', scrollBehavior: 'smooth' }}>
@@ -136,6 +139,29 @@ export default function SettingsView() {
               </div>
               <Switch checked={minimizeToTrayOnClose} onCheckedChange={setMinimizeToTrayOnClose} />
             </div>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex items-center space-x-2 border-b border-border/50 pb-2 mb-4">
+             <Network className="h-5 w-5 text-primary" />
+             <h3 className="text-lg font-semibold tracking-tight">{t('settings.languageRegion')}</h3>
+          </div>
+          <p className="text-sm text-muted-foreground mr-10 leading-relaxed max-w-2xl">
+            {t('settings.languageDescription')}
+          </p>
+          <div className="flex items-center justify-between bg-card p-6 rounded-xl border border-border shadow-sm max-w-2xl gap-4">
+            <div className="space-y-0.5">
+              <h4 className="text-base font-semibold">{t('settings.language')}</h4>
+            </div>
+            <select
+              className="h-10 rounded-md border border-input bg-background px-3 text-sm"
+              value={language}
+              onChange={(event) => setLanguage(event.target.value as 'en' | 'vi')}
+            >
+              <option value="en">{t('settings.english')}</option>
+              <option value="vi">{t('settings.vietnamese')}</option>
+            </select>
           </div>
         </section>
         

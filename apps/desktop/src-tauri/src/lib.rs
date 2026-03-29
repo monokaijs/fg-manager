@@ -6,6 +6,11 @@ pub struct HttpClient(pub reqwest::Client);
 pub mod cmds {
     use tauri::Manager;
 
+    fn default_downloads_dir(app_handle: &tauri::AppHandle) -> std::path::PathBuf {
+        let config_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| std::path::PathBuf::from("/tmp"));
+        config_dir.join("downloads")
+    }
+
     #[tauri::command]
     pub fn check_autostart_hidden() -> bool {
         std::env::args().any(|arg| arg == "--hidden")
@@ -110,6 +115,63 @@ pub mod cmds {
             .current_dir(parent_dir)
             .spawn()
             .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub fn open_folder_path(path: Option<String>, app_handle: tauri::AppHandle) -> Result<(), String> {
+        let final_path = path
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| default_downloads_dir(&app_handle));
+
+        std::fs::create_dir_all(&final_path).map_err(|e| e.to_string())?;
+
+        #[cfg(target_os = "windows")]
+        {
+            std::process::Command::new("explorer")
+                .arg(final_path.to_string_lossy().to_string())
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            std::process::Command::new("xdg-open")
+                .arg(final_path.to_string_lossy().to_string())
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub fn reveal_in_folder(path: String) -> Result<(), String> {
+        let target = std::path::PathBuf::from(&path);
+
+        #[cfg(target_os = "windows")]
+        {
+            if target.is_file() {
+                std::process::Command::new("explorer")
+                    .arg(format!("/select,{}", target.to_string_lossy()))
+                    .spawn()
+                    .map_err(|e| e.to_string())?;
+            } else {
+                std::process::Command::new("explorer")
+                    .arg(target.to_string_lossy().to_string())
+                    .spawn()
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            std::process::Command::new("xdg-open")
+                .arg(target.to_string_lossy().to_string())
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+
         Ok(())
     }
 
@@ -285,10 +347,13 @@ pub fn run() {
         fuckingfast::ff_pause,
         fuckingfast::ff_resume,
         fuckingfast::ff_remove,
+        fuckingfast::ff_set_speed_limit,
         fuckingfast::ff_get_tasks,
         cmds::check_autostart_hidden,
         cmds::check_game_disk_status,
         cmds::launch_file,
+        cmds::open_folder_path,
+        cmds::reveal_in_folder,
         cmds::force_extract_meta,
         native_fetch,
         native_fetch_bytes,

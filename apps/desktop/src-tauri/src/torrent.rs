@@ -8,6 +8,7 @@ use std::path::PathBuf;
 pub struct TorrentState {
     pub session: Arc<Session>,
     pub slugs: Arc<Mutex<HashMap<String, String>>>, // info_hash -> game_slug
+    pub download_dirs: Arc<Mutex<HashMap<String, String>>>, // info_hash -> output folder
     pub slugs_path: PathBuf,
     pub download_dir: PathBuf,
 }
@@ -40,6 +41,7 @@ impl TorrentState {
         Ok(Self {
             session,
             slugs: Arc::new(Mutex::new(slugs)),
+            download_dirs: Arc::new(Mutex::new(HashMap::new())),
             slugs_path,
             download_dir: download_dir.clone(),
         })
@@ -61,8 +63,9 @@ pub async fn torrent_ping(_state: State<'_, TorrentState>) -> Result<String, Str
 #[tauri::command]
 pub async fn torrent_add_magnet(magnet: String, game_slug: Option<String>, download_dir: Option<String>, state: State<'_, TorrentState>) -> Result<String, String> {
     let output_folder = download_dir.clone().map(PathBuf::from).unwrap_or(state.download_dir.clone());
+    let output_folder_str = output_folder.to_string_lossy().to_string();
     let opts = librqbit::AddTorrentOptions {
-        output_folder: Some(output_folder.to_string_lossy().to_string()),
+        output_folder: Some(output_folder_str.clone()),
         ..Default::default()
     };
     
@@ -81,14 +84,19 @@ pub async fn torrent_add_magnet(magnet: String, game_slug: Option<String>, downl
         state.save_slugs().await;
     }
 
+    {
+        state.download_dirs.lock().await.insert(info_hash.clone(), output_folder_str);
+    }
+
     Ok(info_hash)
 }
 
 #[tauri::command]
 pub async fn torrent_add_url(url: String, game_slug: Option<String>, download_dir: Option<String>, state: State<'_, TorrentState>) -> Result<String, String> {
     let output_folder = download_dir.clone().map(PathBuf::from).unwrap_or(state.download_dir.clone());
+    let output_folder_str = output_folder.to_string_lossy().to_string();
     let opts = librqbit::AddTorrentOptions {
-        output_folder: Some(output_folder.to_string_lossy().to_string()),
+        output_folder: Some(output_folder_str.clone()),
         ..Default::default()
     };
     
@@ -107,12 +115,18 @@ pub async fn torrent_add_url(url: String, game_slug: Option<String>, download_di
         state.save_slugs().await;
     }
 
+    {
+        state.download_dirs.lock().await.insert(info_hash.clone(), output_folder_str);
+    }
+
     Ok(info_hash)
 }
 
 #[tauri::command]
 pub async fn torrent_get_tasks(state: State<'_, TorrentState>) -> Result<Vec<serde_json::Value>, String> {
     let slugs = state.slugs.lock().await.clone();
+    let download_dirs = state.download_dirs.lock().await.clone();
+    let fallback_download_dir = state.download_dir.to_string_lossy().to_string();
     let session = state.session.clone();
 
     tokio::task::spawn_blocking(move || {
@@ -120,6 +134,10 @@ pub async fn torrent_get_tasks(state: State<'_, TorrentState>) -> Result<Vec<ser
             torrents_iter.map(|(_, handle)| {
                 let info_hash = handle.shared().info_hash.as_string();
                 let game_slug = slugs.get(&info_hash).cloned();
+                let save_path = download_dirs
+                    .get(&info_hash)
+                    .cloned()
+                    .unwrap_or_else(|| fallback_download_dir.clone());
                 
                 let stats = handle.stats();
                 
@@ -172,6 +190,7 @@ pub async fn torrent_get_tasks(state: State<'_, TorrentState>) -> Result<Vec<ser
                     "downloaded": stats.progress_bytes,
                     "peers": peers,
                     "seeds": seeds,
+                    "savePath": save_path,
                 })
             }).collect()
         });
@@ -225,6 +244,10 @@ pub async fn torrent_remove(id: String, delete_files: bool, state: State<'_, Tor
     {
         let mut slugs = state.slugs.lock().await;
         slugs.remove(&id);
+    }
+    {
+        let mut dirs = state.download_dirs.lock().await;
+        dirs.remove(&id);
     }
     let _ = state.save_slugs().await;
 

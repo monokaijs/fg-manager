@@ -106,6 +106,16 @@ class DownloadManager {
     return true;
   }
 
+  async setDownloadSpeedLimit(limitKbps: number) {
+    const available = await this.getAvailableAdapters();
+    await Promise.allSettled(
+      available
+        .filter((a) => typeof a.setDownloadSpeedLimit === 'function')
+        .map((a) => a.setDownloadSpeedLimit!(limitKbps))
+    );
+    return true;
+  }
+
   async getTasks(): Promise<DownloadTask[]> {
     // Check availability first (uses cache, fast)
     const available: DownloaderAdapter[] = [];

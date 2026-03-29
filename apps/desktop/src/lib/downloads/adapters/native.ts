@@ -72,7 +72,10 @@ export class NativeAdapter implements DownloaderAdapter {
     try {
       // The Rust backend returns an array mapping our DownloadTask shape
       const tasks: DownloadTask[] = await invoke('torrent_get_tasks');
-      return tasks;
+      return tasks.map((task: any) => ({
+        ...task,
+        savePath: task.savePath,
+      }));
     } catch {
       return [];
     }

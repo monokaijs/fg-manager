@@ -112,6 +112,21 @@ export class QBittorrentAdapter implements DownloaderAdapter {
     } catch { return false; }
   }
 
+  async setDownloadSpeedLimit(limitKbps: number): Promise<boolean> {
+    try {
+      const formData = new URLSearchParams();
+      formData.append('limit', String(Math.max(0, Math.floor(limitKbps)) * 1024));
+      const res = await this.safeFetch('/api/v2/transfer/setDownloadLimit', {
+        method: 'POST',
+        body: formData.toString(),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
   private mapState(state: string, progress: number): DownloadTask['status'] {
     if (progress === 1) return 'completed';
     if (state.includes('downloading')) return 'downloading';
@@ -143,7 +158,8 @@ export class QBittorrentAdapter implements DownloaderAdapter {
           uploadSpeed: t.upspeed,
           eta: t.eta,
           totalSize: t.size,
-          downloaded: t.downloaded
+          downloaded: t.downloaded,
+          savePath: t.save_path
         }));
     } catch {
       return [];

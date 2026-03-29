@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom"
 import { getCurrentWindow } from "@tauri-apps/api/window"
 import { useDownloadStore } from "@/stores/downloadStore"
 import { useSettingsStore } from "@/stores/settingsStore"
+import { useI18n } from "@/i18n/useI18n"
 import { NavMain } from "@/components/nav-main"
 import { Link } from "react-router-dom"
 import {
@@ -20,6 +21,7 @@ import {
 // Using exact structure of sidebar-07 sample block
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const location = useLocation();
+  const { t } = useI18n();
   const activeDownloads = useDownloadStore(state => 
     state.tasks.filter(t => typeof t.progress === 'number' && t.progress < 1).length
   );
@@ -27,23 +29,23 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const data = {
     navMain: [
       { 
-        title: "Games Catalog", 
+        title: t('app.gamesCatalog'), 
         url: "/games", 
         icon: Search,
         isActive: location.pathname.startsWith("/games") || location.pathname === "/",
         items: [
-          { title: "All Games", url: "/games" },
-          { title: "Favorites", url: "/favorites" }
+          { title: t('app.allGames'), url: "/games" },
+          { title: t('app.favorites'), url: "/favorites" }
         ]
       },
       { 
-        title: "My Library", 
+        title: t('app.myLibrary'), 
         url: "/library", 
         icon: Library,
         isActive: location.pathname === "/library",
       },
       { 
-        title: "Downloads", 
+        title: t('app.downloads'), 
         url: "/downloads", 
         icon: Download,
         isActive: location.pathname === "/downloads",
@@ -86,16 +88,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={data.navMain} groupLabel={t('app.platform')} />
       </SidebarContent>
       
       <SidebarFooter>
          <SidebarMenu>
           <SidebarMenuItem>
             <Link to="/settings" className="flex items-center gap-2 w-full">
-              <SidebarMenuButton tooltip="Settings" isActive={location.pathname === "/settings"}>
+              <SidebarMenuButton tooltip={t('app.settings')} isActive={location.pathname === "/settings"}>
                 <Settings className="h-4 w-4" />
-                <span>Settings</span>
+                <span>{t('app.settings')}</span>
               </SidebarMenuButton>
             </Link>
           </SidebarMenuItem>

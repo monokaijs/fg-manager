@@ -60,6 +60,15 @@ export class FuckingFastAdapter implements DownloaderAdapter {
     }
   }
 
+  async setDownloadSpeedLimit(limitKbps: number): Promise<boolean> {
+    try {
+      await invoke('ff_set_speed_limit', { limitKbps: Math.max(0, Math.floor(limitKbps)) });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async getTasks(): Promise<DownloadTask[]> {
     try {
       const stats = await invoke<any[]>('ff_get_tasks');
@@ -74,6 +83,7 @@ export class FuckingFastAdapter implements DownloaderAdapter {
         eta: s.eta,
         totalSize: s.total_size,
         downloaded: s.downloaded,
+        savePath: s.save_path,
       }));
     } catch {
       return [];

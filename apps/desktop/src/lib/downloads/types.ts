@@ -10,6 +10,7 @@ export interface DownloadTask {
   eta: number; // seconds
   totalSize: number;
   downloaded: number;
+  savePath?: string;
   peers?: number;
   seeds?: number;
 }
@@ -27,6 +28,7 @@ export interface DownloaderAdapter {
   pause(id: string): Promise<boolean>;
   resume(id: string): Promise<boolean>;
   remove(id: string, deleteFiles: boolean): Promise<boolean>;
+  setDownloadSpeedLimit?(limitKbps: number): Promise<boolean>;
   
   getTasks(): Promise<DownloadTask[]>;
 }
