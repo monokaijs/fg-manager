@@ -7,6 +7,10 @@ class DownloadManager {
   private adapters: DownloaderAdapter[] = [];
   private activeAdapter: DownloaderAdapter | null = null;
 
+  // Cache adapter availability to avoid redundant IPC/network calls every poll
+  private availabilityCache: Map<string, { available: boolean; checkedAt: number }> = new Map();
+  private readonly AVAILABILITY_TTL = 15000; // 15 seconds
+
   constructor() {
     this.registerAdapter(new NativeAdapter());
     this.registerAdapter(new QBittorrentAdapter());
@@ -17,10 +21,21 @@ class DownloadManager {
     this.adapters.push(adapter);
   }
 
+  private async isAdapterAvailable(adapter: DownloaderAdapter): Promise<boolean> {
+    const cached = this.availabilityCache.get(adapter.id);
+    const now = Date.now();
+    if (cached && (now - cached.checkedAt) < this.AVAILABILITY_TTL) {
+      return cached.available;
+    }
+    const available = await adapter.isAvailable();
+    this.availabilityCache.set(adapter.id, { available, checkedAt: now });
+    return available;
+  }
+
   async getAvailableAdapters() {
     const available = [];
     for (const adapter of this.adapters) {
-      if (await adapter.isAvailable()) {
+      if (await this.isAdapterAvailable(adapter)) {
         available.push(adapter);
       }
     }
@@ -64,7 +79,7 @@ class DownloadManager {
 
   async addFastUrls(id: string, gameSlug: string, urls: string[]) {
     const adapter = this.adapters.find(a => a.id === 'fuckingfast') as FuckingFastAdapter | undefined;
-    if (adapter && await adapter.isAvailable()) {
+    if (adapter && await this.isAdapterAvailable(adapter)) {
       return await adapter.addUrls(id, gameSlug, urls);
     }
     return false;
@@ -94,7 +109,7 @@ class DownloadManager {
   async getTasks(): Promise<DownloadTask[]> {
     const unifiedTasks: DownloadTask[] = [];
     for (const adapter of this.adapters) {
-      if (await adapter.isAvailable()) {
+      if (await this.isAdapterAvailable(adapter)) {
          const tasks = await adapter.getTasks();
          unifiedTasks.push(...tasks);
       }

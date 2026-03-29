@@ -15,28 +15,63 @@ interface DownloadState {
   remove: (id: string, deleteFiles: boolean) => Promise<void>;
 }
 
+// Fast shallow comparison of task arrays to avoid unnecessary React re-renders.
+// This is the critical fix: without this, every 2s poll creates a new array reference
+// and Zustand triggers re-renders across the ENTIRE component tree.
+function tasksChanged(prev: DownloadTask[], next: DownloadTask[]): boolean {
+  if (prev.length !== next.length) return true;
+  for (let i = 0; i < prev.length; i++) {
+    const a = prev[i], b = next[i];
+    if (
+      a.id !== b.id ||
+      a.status !== b.status ||
+      a.progress !== b.progress ||
+      a.downloadSpeed !== b.downloadSpeed ||
+      a.downloaded !== b.downloaded ||
+      a.eta !== b.eta ||
+      a.gameSlug !== b.gameSlug
+    ) return true;
+  }
+  return false;
+}
+
+let isRefreshing = false;
+
 export const useDownloadStore = create<DownloadState>((set, get) => ({
   tasks: [],
   adapterId: null,
-  
+
   setAdapter: (id) => {
     downloadManager.setActiveAdapter(id);
     set({ adapterId: id });
   },
-  
+
   refreshTasks: async () => {
-    const active = downloadManager.getActiveAdapter();
-    if (active) {
-      const tasks = await downloadManager.getTasks();
-      set({ tasks });
-    } else {
-      // Try to auto-connect just in case qBittorrent boots up recently
-      const hasAdapter = await downloadManager.autoConnect();
-      if (hasAdapter) {
-        set({ adapterId: downloadManager.getActiveAdapter()?.id });
-        const tasks = await downloadManager.getTasks();
-        set({ tasks });
+    // Prevent overlapping refreshes from stacking up IPC calls
+    if (isRefreshing) return;
+    isRefreshing = true;
+
+    try {
+      const active = downloadManager.getActiveAdapter();
+      if (active) {
+        const newTasks = await downloadManager.getTasks();
+        const prev = get().tasks;
+        if (tasksChanged(prev, newTasks)) {
+          set({ tasks: newTasks });
+        }
+      } else {
+        const hasAdapter = await downloadManager.autoConnect();
+        if (hasAdapter) {
+          set({ adapterId: downloadManager.getActiveAdapter()?.id });
+          const newTasks = await downloadManager.getTasks();
+          const prev = get().tasks;
+          if (tasksChanged(prev, newTasks)) {
+            set({ tasks: newTasks });
+          }
+        }
       }
+    } finally {
+      isRefreshing = false;
     }
   },
 
@@ -51,7 +86,7 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
   addFastUrls: async (id, slug, urls) => {
     return downloadManager.addFastUrls(id, slug, urls);
   },
-  
+
   pause: async (id) => {
     await downloadManager.pause(id);
     get().refreshTasks();
@@ -66,7 +101,19 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
   }
 }));
 
-// Global polling block
-setInterval(() => {
-  useDownloadStore.getState().refreshTasks();
-}, 2000);
+// Global polling — use adaptive interval:
+// 3s when there are active downloads, 10s when idle
+let pollTimer: ReturnType<typeof setTimeout> | null = null;
+
+function schedulePoll() {
+  const tasks = useDownloadStore.getState().tasks;
+  const hasActive = tasks.some(t => t.status === 'downloading' || t.status === 'checking' || t.status === 'extracting');
+  const interval = hasActive ? 3000 : 10000;
+
+  pollTimer = setTimeout(async () => {
+    await useDownloadStore.getState().refreshTasks();
+    schedulePoll();
+  }, interval);
+}
+
+schedulePoll();
