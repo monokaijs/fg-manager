@@ -20,13 +20,31 @@ pub mod cmds {
     }
 
     #[tauri::command]
-    pub fn check_game_disk_status(slug: String, app_handle: tauri::AppHandle) -> DiskStatus {
+    pub fn check_game_disk_status(slug: String, library_path: Option<String>, app_handle: tauri::AppHandle) -> DiskStatus {
         let config_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| std::path::PathBuf::from("/tmp"));
-        let game_dir = config_dir.join("downloads").join(&slug);
+        
+        let mut check_dirs = vec![
+            config_dir.join("downloads").join(&slug)
+        ];
 
-        if !game_dir.exists() {
-            return DiskStatus { active: false, setup_path: None, executable_path: None, meta_executable: None };
+        // Ensure user library mounts are iteratively inspected!
+        if let Some(custom) = library_path {
+            check_dirs.push(std::path::PathBuf::from(&custom).join(&slug));
+            check_dirs.push(std::path::PathBuf::from(&custom).join(format!("{}_installed", &slug)));
         }
+
+        let mut final_dir = None;
+        for path in check_dirs {
+            if path.exists() {
+                final_dir = Some(path);
+                break;
+            }
+        }
+
+        let game_dir = match final_dir {
+            Some(d) => d,
+            None => return DiskStatus { active: false, setup_path: None, executable_path: None, meta_executable: None },
+        };
 
         let mut setup = None;
         let mut exe = None;

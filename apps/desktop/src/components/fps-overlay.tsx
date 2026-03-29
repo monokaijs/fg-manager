@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 
 export function FpsOverlay() {
   const [fps, setFps] = useState(0);
-  const [drops, setDrops] = useState(0);
   const [longTasks, setLongTasks] = useState(0);
   const [layoutShifts, setLayoutShifts] = useState(0);
   
@@ -33,7 +32,6 @@ export function FpsOverlay() {
       if (delta >= 1000) {
         const currentFps = Math.round((frameCount * 1000) / delta);
         setFps(currentFps);
-        if (currentFps < 50) setDrops(d => d + 1);
         frameCount = 0;
         lastTime = time;
       }

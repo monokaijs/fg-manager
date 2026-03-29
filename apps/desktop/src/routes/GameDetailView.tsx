@@ -7,6 +7,7 @@ import { AlertCircle, ArrowLeft, Download, HardDrive, Star, Magnet, Copy, Chevro
 import { toast } from "sonner";
 import { useGamesStore } from "@/store/useGamesStore";
 import { useDownloadStore } from "@/stores/downloadStore";
+import { useSettingsStore } from "@/stores/settingsStore";
 import { Progress } from "@/components/ui/progress";
 import { decodeHtml, formatBytes } from "@/lib/utils";
 import { invoke } from '@tauri-apps/api/core';
@@ -39,7 +40,8 @@ export default function GameDetailView() {
 
   useEffect(() => {
     if (!activeTask && slug) {
-      invoke<DiskStatus>('check_game_disk_status', { slug })
+      const { downloadPath } = useSettingsStore.getState();
+      invoke<DiskStatus>('check_game_disk_status', { slug, libraryPath: downloadPath })
         .then(res => setDiskStatus(res))
         .catch(console.error);
     } else {
