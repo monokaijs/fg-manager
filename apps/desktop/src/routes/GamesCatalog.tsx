@@ -7,6 +7,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useGamesStore } from "@/store/useGamesStore";
 import { useDownloadStore } from "@/stores/downloadStore";
 import { decodeHtml } from "@/lib/utils";
+import { CachedImage } from "@/components/ui/cached-image";
 
 export default function GamesCatalog({ filter }: { filter?: "favorites" | "recent" }) {
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
@@ -98,7 +99,7 @@ export default function GamesCatalog({ filter }: { filter?: "favorites" | "recen
               {filteredGames.map((game, i) => (
                 <Link to={`/games/view/${game.slug}`} key={i} className="group relative aspect-[3/4] rounded-xl bg-muted/30 border border-border/50 overflow-hidden transition-all hover:shadow-xl hover:shadow-primary/5 cursor-pointer flex flex-col">
                   {game.postImage ? (
-                    <img src={game.postImage} alt={decodeHtml(game.title)} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <CachedImage src={game.postImage} alt={decodeHtml(game.title)} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   ) : (
                     <div className="absolute inset-0 bg-muted flex items-center justify-center">No Image</div>
                   )}
@@ -127,7 +128,7 @@ export default function GamesCatalog({ filter }: { filter?: "favorites" | "recen
               {filteredGames.map((game, i) => (
                 <Link to={`/games/view/${game.slug}`} key={i} className="flex items-center space-x-4 p-3 rounded-lg border border-border/50 bg-muted/10 hover:bg-muted/30 hover:border-border transition-colors cursor-pointer group">
                   <div className="w-20 h-10 bg-muted/50 rounded overflow-hidden shrink-0 object-cover relative">
-                    {game.postImage && <img src={game.postImage} alt={decodeHtml(game.title)} className="w-full h-full object-cover" />}
+                    {game.postImage && <CachedImage src={game.postImage} alt={decodeHtml(game.title)} className="w-full h-full object-cover" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-medium truncate">{decodeHtml(game.title)}</h3>

@@ -5,6 +5,7 @@ import { useGamesStore } from "@/store/useGamesStore";
 import { Link } from "react-router-dom";
 import { decodeHtml } from "@/lib/utils";
 import { useMemo } from "react";
+import { CachedImage } from "@/components/ui/cached-image";
 
 export default function LibraryView() {
   const { tasks } = useDownloadStore();
@@ -44,7 +45,7 @@ export default function LibraryView() {
               return (
                 <Link to={`/games/view/${game.slug}`} key={i} className="group relative aspect-[3/4] rounded-xl bg-muted/30 border border-border/50 overflow-hidden transition-all hover:shadow-xl hover:shadow-primary/5 cursor-pointer flex flex-col">
                   {game.postImage ? (
-                    <img src={game.postImage} alt={decodeHtml(game.title)} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <CachedImage src={game.postImage} alt={decodeHtml(game.title)} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                   ) : (
                     <div className="absolute inset-0 bg-muted flex items-center justify-center">No Image</div>
                   )}
