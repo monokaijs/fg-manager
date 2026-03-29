@@ -108,15 +108,13 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
 }));
 
 // Global polling — use adaptive interval:
-// 3s when there are active downloads, 10s when idle
-let pollTimer: ReturnType<typeof setTimeout> | null = null;
-
+// 1s when there are active downloads, 10s when idle
 function schedulePoll() {
   const tasks = useDownloadStore.getState().tasks;
   const hasActive = tasks.some(t => t.status === 'downloading' || t.status === 'checking' || t.status === 'extracting');
-  const interval = hasActive ? 3000 : 30000;
+  const interval = hasActive ? 1000 : 10000;
 
-  pollTimer = setTimeout(async () => {
+  setTimeout(async () => {
     await useDownloadStore.getState().refreshTasks();
     schedulePoll();
   }, interval);
