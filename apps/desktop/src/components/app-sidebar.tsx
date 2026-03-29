@@ -20,9 +20,9 @@ import {
 // Using exact structure of sidebar-07 sample block
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const location = useLocation();
-  const { tasks } = useDownloadStore();
-
-  const activeDownloads = tasks.filter(t => typeof t.progress === 'number' && t.progress < 1).length;
+  const activeDownloads = useDownloadStore(state => 
+    state.tasks.filter(t => typeof t.progress === 'number' && t.progress < 1).length
+  );
 
   const data = {
     navMain: [

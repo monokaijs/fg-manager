@@ -6,14 +6,17 @@ import { useMemo } from "react";
 import { GameCard } from "@/components/game-card";
 
 export default function LibraryView() {
-  const { tasks } = useDownloadStore();
+  // Only subscribe to task slugs so it doesn't re-render on progress ticks!
+  const taskSlugs = useDownloadStore(state => 
+    state.tasks.map(t => t.gameSlug).filter(Boolean).sort().join(',')
+  );
   const { games } = useGamesStore();
 
   const libraryGames = useMemo(() => {
     // Only games that are currently downloading or finished
-    const taskSlugs = new Set(tasks.map(t => t.gameSlug).filter(Boolean));
-    return games.filter(g => taskSlugs.has(g.slug));
-  }, [tasks, games]);
+    const slugsSet = new Set(taskSlugs.split(',').filter(Boolean));
+    return games.filter(g => slugsSet.has(g.slug));
+  }, [taskSlugs, games]);
 
   return (
     <>

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { decodeHtml } from "@/lib/utils";
 import { CachedImage } from "@/components/ui/cached-image";
 import { useDownloadStore } from "@/stores/downloadStore";
+import React, { useMemo } from 'react';
 import { type GameBrief } from "@/store/useGamesStore";
 
 interface GameCardProps {
@@ -10,18 +11,19 @@ interface GameCardProps {
   showStatus?: boolean;
 }
 
-export function GameCard({ game, viewMode = "grid", showStatus = false }: GameCardProps) {
-  const { tasks } = useDownloadStore();
-  const task = tasks.find((t) => t.gameSlug === game.slug);
+export const GameCard = React.memo(function GameCard({ game, viewMode = "grid", showStatus = false }: GameCardProps) {
+  // Only subscribe to this specific game's task to prevent massive 100-card re-renders on ANY progress tick
+  const task = useDownloadStore(state => state.tasks.find((t) => t.gameSlug === game.slug));
+  const decodedTitle = useMemo(() => decodeHtml(game.title), [game.title]);
 
   if (viewMode === "list") {
     return (
       <Link to={`/games/view/${game.slug}`} className="flex items-center space-x-4 p-3 rounded-lg border border-border/50 bg-muted/10 hover:bg-muted/30 hover:border-border transition-colors cursor-pointer group">
         <div className="w-20 h-10 bg-muted/50 rounded overflow-hidden shrink-0 object-cover relative">
-          {game.postImage && <CachedImage src={game.postImage} alt={decodeHtml(game.title)} className="w-full h-full object-cover" />}
+          {game.postImage && <CachedImage src={game.postImage} alt={decodedTitle} className="w-full h-full object-cover" />}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-medium truncate">{decodeHtml(game.title)}</h3>
+          <h3 className="text-sm font-medium truncate">{decodedTitle}</h3>
         </div>
         {task && (
           <div className="w-24 shrink-0 mx-2 h-1.5 bg-muted/50 rounded-full overflow-hidden self-center border border-border/50">
@@ -39,7 +41,7 @@ export function GameCard({ game, viewMode = "grid", showStatus = false }: GameCa
   return (
     <Link to={`/games/view/${game.slug}`} className="group relative aspect-[3/4] rounded-xl bg-muted/30 border border-border/50 overflow-hidden transition-all hover:shadow-xl hover:shadow-primary/5 cursor-pointer flex flex-col">
       {game.postImage ? (
-        <CachedImage src={game.postImage} alt={decodeHtml(game.title)} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <CachedImage src={game.postImage} alt={decodedTitle} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
       ) : (
         <div className="absolute inset-0 bg-muted flex items-center justify-center">No Image</div>
       )}
@@ -64,4 +66,4 @@ export function GameCard({ game, viewMode = "grid", showStatus = false }: GameCa
       </div>
     </Link>
   );
-}
+});

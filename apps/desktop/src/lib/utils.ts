@@ -5,11 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+let decodeElement: HTMLTextAreaElement | null = null;
 export const decodeHtml = (html: string | undefined | null) => {
   if (!html) return '';
-  const txt = document.createElement("textarea");
-  txt.innerHTML = html;
-  return txt.value;
+  if (typeof document === 'undefined') return html;
+  if (!decodeElement) decodeElement = document.createElement("textarea");
+  decodeElement.innerHTML = html;
+  return decodeElement.value;
 };
 
 export const formatBytes = (bytes: number) => {

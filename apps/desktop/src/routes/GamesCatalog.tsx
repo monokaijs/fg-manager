@@ -12,6 +12,15 @@ export default function GamesCatalog({ filter }: { filter?: "favorites" | "recen
   const [searchQuery, setSearchQuery] = useState("");
   const { games, favorites } = useGamesStore();
 
+  // Create a memoized lookup table of decoded lowercased titles for ultra-fast filtering
+  const decodedTitles = useMemo(() => {
+    const map = new Map<string, string>();
+    games.forEach(g => {
+      map.set(g.slug, decodeHtml(g.title).toLowerCase());
+    });
+    return map;
+  }, [games]);
+
   const filteredGames = useMemo(() => {
     let list = games;
     if (filter === "favorites") {
@@ -22,10 +31,13 @@ export default function GamesCatalog({ filter }: { filter?: "favorites" | "recen
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      list = list.filter(g => decodeHtml(g.title).toLowerCase().includes(q));
+      list = list.filter(g => {
+        const title = decodedTitles.get(g.slug);
+        return title ? title.includes(q) : false;
+      });
     }
     return list.slice(0, 100); // Limit to 100 for dev performance
-  }, [games, favorites, searchQuery, filter]);
+  }, [games, favorites, searchQuery, filter, decodedTitles]);
 
   return (
     <>
