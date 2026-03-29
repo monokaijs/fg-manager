@@ -50,10 +50,13 @@ pub mod cmds {
         let mut exe = None;
         let mut meta_target = None;
 
-        if let Ok(meta_bytes) = std::fs::read_to_string(game_dir.join("fg_setup_meta.json")) {
-            if let Ok(meta_json) = serde_json::from_str::<serde_json::Value>(&meta_bytes) {
-                if let Some(t_exe) = meta_json.get("target_executable").and_then(|v| v.as_str()) {
-                    meta_target = Some(t_exe.to_string());
+        for path in &check_dirs {
+            if let Ok(meta_bytes) = std::fs::read_to_string(path.join("fg_setup_meta.json")) {
+                if let Ok(meta_json) = serde_json::from_str::<serde_json::Value>(&meta_bytes) {
+                    if let Some(t_exe) = meta_json.get("target_executable").and_then(|v| v.as_str()) {
+                        meta_target = Some(t_exe.to_string());
+                        break;
+                    }
                 }
             }
         }
