@@ -1,74 +1,60 @@
-import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useEffect } from "react";
+import { HashRouter as Router, Routes, Route } from "react-router-dom";
+import { AppSidebar } from "@/components/app-sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { Toaster } from "sonner";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useGamesStore } from "@/store/useGamesStore";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+import GamesCatalog from "@/routes/GamesCatalog";
+import GameDetailView from "@/routes/GameDetailView";
+import LibraryView from "@/routes/LibraryView";
+import DownloadsView from "@/routes/DownloadsView";
+import SettingsView from "@/routes/SettingsView";
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
-    // We didn"t set up the rust command in this basic setup yet, but we will mock it if invoke fails.
-    try {
-      setGreetMsg(await invoke("greet", { name }));
-    } catch {
-      setGreetMsg(
-        `Hello, ${name || "Tauri Developer"}! Welcome to fg-manager.`,
-      );
-    }
-  }
+export default function App() {
+  const initDB = useGamesStore((s) => s.initDB);
+
+  useEffect(() => {
+    initDB();
+
+    // Track maximized state for border styling
+    const win = getCurrentWindow();
+    let unlistenResize: () => void;
+
+    const updateMaximizedClass = async () => {
+      document.documentElement.classList.toggle('maximized', await win.isMaximized());
+    };
+
+    updateMaximizedClass();
+    win.onResized(updateMaximizedClass).then(unlisten => {
+      unlistenResize = unlisten;
+    });
+
+    return () => {
+      if (unlistenResize) unlistenResize();
+    };
+  }, [initDB]);
 
   return (
-    <div className="flex bg-background items-center justify-center min-h-screen p-4 text-foreground dark">
-      <Card className="w-full max-w-md shadow-2xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-light tracking-tight mb-2">
-            Welcome to{" "}
-            <span className="font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-indigo-500">
-              Tauri
-            </span>
-          </CardTitle>
-          <CardDescription>
-            A beautiful Turborepo, Vite, React, Tailwind v4 and Shadcn stack.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col space-y-4">
-            <Input
-              id="greet-input"
-              type="text"
-              placeholder="Enter a name..."
-              value={name}
-              onChange={(e) => setName(e.currentTarget.value)}
-            />
-            <Button
-              onClick={greet}
-              className="w-full font-medium"
-            >
-              Greet
-            </Button>
-          </div>
-          {greetMsg && (
-            <div className="mt-6 p-4 rounded-md bg-secondary text-secondary-foreground text-center animate-in fade-in slide-in-from-bottom-2">
-              <p className="text-md font-medium text-emerald-600 dark:text-emerald-400">{greetMsg}</p>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="text-sm text-center text-muted-foreground justify-center">
-          Powered by fg-manager
-        </CardFooter>
-      </Card>
-    </div>
+    <Router>
+      <SidebarProvider className="font-sans h-full w-full overflow-hidden">
+        <AppSidebar />
+        <SidebarInset className="bg-background relative flex-1 overflow-y-auto overflow-x-hidden h-full flex-col">
+          <Routes>
+            <Route path="/library" element={<LibraryView />} />
+            <Route path="/games" element={<GamesCatalog />} />
+            <Route path="/favorites" element={<GamesCatalog filter="favorites" />} />
+            <Route path="/games/view/:slug" element={<GameDetailView />} />
+            <Route path="/downloads" element={<DownloadsView />} />
+            <Route path="/settings" element={<SettingsView />} />
+            {/* Fallback to games catalog */}
+            <Route path="/" element={<GamesCatalog />} />
+            <Route path="*" element={<GamesCatalog />} />
+          </Routes>
+        </SidebarInset>
+      </SidebarProvider>
+      <Toaster position="bottom-right" richColors />
+    </Router>
   );
 }
-
-export default App;
