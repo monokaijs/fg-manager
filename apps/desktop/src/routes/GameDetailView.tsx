@@ -49,6 +49,15 @@ export default function GameDetailView() {
     }
   }, [activeTask, slug]);
 
+  // If disk is present but meta parsing failed organically, trigger a fallback silent parser natively
+  useEffect(() => {
+    if (diskStatus?.active && !diskStatus?.meta_executable && !activeTask && slug) {
+      const { downloadPath } = useSettingsStore.getState();
+      invoke('force_extract_meta', { slug, libraryPath: downloadPath })
+        .catch(console.error);
+    }
+  }, [diskStatus?.active, diskStatus?.meta_executable, activeTask, slug]);
+
   if (loading) return (
     <div className="p-8 flex flex-col items-center justify-center h-full">
       <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mb-4" />

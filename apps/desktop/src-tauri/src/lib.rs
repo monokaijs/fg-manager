@@ -86,10 +86,110 @@ pub mod cmds {
     #[tauri::command]
     pub fn launch_file(path: String) -> Result<(), String> {
         let parent_dir = std::path::Path::new(&path).parent().unwrap_or(std::path::Path::new(""));
-        std::process::Command::new(&path)
+        std::process::Command::new("powershell")
+            .arg("-NoProfile")
+            .arg("-WindowStyle").arg("Hidden")
+            .arg("-Command")
+            .arg(format!("Start-Process -FilePath '{}'", path))
             .current_dir(parent_dir)
             .spawn()
             .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+
+    #[tauri::command]
+    pub async fn force_extract_meta(slug: String, library_path: Option<String>, app_handle: tauri::AppHandle) -> Result<(), String> {
+        use std::path::PathBuf;
+        
+        // Find base directory
+        let config_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| PathBuf::from("/tmp"));
+        let mut check_dirs = vec![config_dir.join("downloads").join(&slug)];
+        if let Some(custom) = library_path {
+            check_dirs.push(PathBuf::from(&custom).join(&slug));
+        }
+
+        let mut base_dir = None;
+        for path in &check_dirs {
+            if path.exists() {
+                base_dir = Some(path.clone());
+                break;
+            }
+        }
+
+        let game_dir = match base_dir {
+            Some(d) => d,
+            None => return Ok(()),
+        };
+
+        if game_dir.join("fg_setup_meta.json").exists() {
+            return Ok(());
+        }
+
+        let mut setup_exe = None;
+        if let Ok(entries) = std::fs::read_dir(&game_dir) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                if entry.file_name().to_string_lossy().to_lowercase() == "setup.exe" {
+                    setup_exe = Some(entry.path());
+                    break;
+                }
+            }
+        }
+
+        let setup_path = match setup_exe {
+            Some(p) => p,
+            None => return Ok(()),
+        };
+
+        let innoextract_dir = config_dir.join("bin");
+        let _ = std::fs::create_dir_all(&innoextract_dir);
+        let innoextract_exe = innoextract_dir.join("innoextract.exe");
+
+        if !innoextract_exe.exists() {
+            let script = format!(
+                "$url = 'https://github.com/dscharrer/innoextract/releases/download/1.9/innoextract-1.9-windows.zip'; \
+                 $zip = '{}\\inno.zip'; \
+                 Invoke-WebRequest -Uri $url -OutFile $zip; \
+                 Expand-Archive -Path $zip -DestinationPath '{}' -Force; \
+                 Remove-Item $zip",
+                 innoextract_dir.display(), innoextract_dir.display()
+            );
+            let _ = std::process::Command::new("powershell")
+                .arg("-NoProfile").arg("-WindowStyle").arg("Hidden")
+                .arg("-Command").arg(&script)
+                .output();
+        }
+
+        if innoextract_exe.exists() {
+            let _ = std::process::Command::new(&innoextract_exe)
+                .arg("--extract").arg("install_script.iss").arg(&setup_path)
+                .current_dir(&game_dir).output();
+
+            let iss_path = game_dir.join("app").join("install_script.iss");
+            let mut extracted_exe = None;
+            
+            if let Ok(script) = std::fs::read_to_string(&iss_path) {
+                for line in script.lines() {
+                    if line.contains("Filename: \"{app}\\") && line.contains(".exe\"") {
+                        if let Some(start) = line.find("\"{app}\\") {
+                            if let Some(end) = line[start + 7..].find('\"') {
+                                extracted_exe = Some(line[start + 7..start + 7 + end].replace("\\", "/"));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+            
+            if let Some(t_exe) = extracted_exe {
+                let _ = std::fs::write(
+                    game_dir.join("fg_setup_meta.json"),
+                    serde_json::json!({ "target_executable": t_exe }).to_string()
+                );
+            }
+            
+            let _ = std::fs::remove_dir_all(game_dir.join("app"));
+        }
+
         Ok(())
     }
 }
@@ -214,6 +314,7 @@ pub fn run() {
         cmds::check_autostart_hidden,
         cmds::check_game_disk_status,
         cmds::launch_file,
+        cmds::force_extract_meta,
         native_fetch,
         native_fetch_bytes,
         quit_app
