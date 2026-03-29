@@ -10,7 +10,6 @@ use futures_util::StreamExt;
 use regex::Regex;
 use std::sync::atomic::{AtomicBool, Ordering};
 use unrar::Archive;
-use crate::rate_limiter::GlobalRateLimiter;
 
 #[derive(Clone, serde::Serialize)]
 pub struct FFTaskStats {
@@ -67,7 +66,6 @@ pub async fn start_download(
     download_dir: PathBuf,
     client: Client,
     tasks: Arc<Mutex<HashMap<String, FFTask>>>,
-    rate_limiter: Arc<GlobalRateLimiter>,
 ) {
     let mut initial_file = None;
     let mut root_dir = None;
@@ -118,15 +116,6 @@ pub async fn start_download(
             return;
         };
         
-        // Use filename from url
-        let file_name = direct_url.split('/').last().unwrap_or("unknown_file.bin");
-        file_path = file_path.join(file_name);
-        
-        if current_idx == 0 {
-            initial_file = Some(file_path.clone());
-            root_dir = Some(file_path.parent().unwrap().to_path_buf());
-        }
-
         let resp = match client.get(&direct_url).send().await {
             Ok(r) => r,
             Err(_) => {
@@ -135,6 +124,35 @@ pub async fn start_download(
                 return;
             }
         };
+
+        // Extract accurate filename from Content-Disposition if present
+        let mut file_name = direct_url.split('/').last().unwrap_or("unknown_file.bin").to_string();
+        if let Some(disp) = resp.headers().get(reqwest::header::CONTENT_DISPOSITION) {
+            if let Ok(disp_str) = disp.to_str() {
+                if let Some(idx) = disp_str.find("filename=\"") {
+                    let start = idx + 10;
+                    if let Some(end) = disp_str[start..].find('"') {
+                        file_name = disp_str[start..start+end].to_string();
+                    }
+                } else if let Some(idx) = disp_str.find("filename=") {
+                    let start = idx + 9;
+                    let end = disp_str[start..].find(';').unwrap_or(disp_str[start..].len());
+                    file_name = disp_str[start..start+end].to_string();
+                }
+            }
+        }
+        
+        // FuckingFast obfuscated hashes are very long, fallback nicely.
+        if file_name.len() > 100 {
+            file_name = format!("download_part_{}.rar", current_idx + 1);
+        }
+
+        file_path = file_path.join(file_name);
+        
+        if current_idx == 0 {
+            initial_file = Some(file_path.clone());
+            root_dir = Some(file_path.parent().unwrap().to_path_buf());
+        }
 
         let size = resp.content_length().unwrap_or(0);
         {
@@ -159,7 +177,9 @@ pub async fn start_download(
 
         let mut stream = resp.bytes_stream();
         let mut last_update = Instant::now();
-        let mut bytes_since_last_update = 0;
+        let mut bytes_since_last_update = 0u64;
+        let mut local_progress = 0u64;
+        let mut local_part = 0u64;
 
         while let Some(chunk_res) = stream.next().await {
             if cancel_token.load(Ordering::SeqCst) {
@@ -172,21 +192,34 @@ pub async fn start_download(
                 if file.write_all(&chunk).await.is_ok() {
                     let len = chunk.len() as u64;
                     bytes_since_last_update += len;
-                    
-                    let mut t = tasks.lock().await;
-                    if let Some(task) = t.get_mut(&id) {
-                        task.progress_bytes += len;
-                        task.current_part_bytes += len;
-                        if last_update.elapsed() > Duration::from_millis(500) {
-                            task.download_speed = ((bytes_since_last_update as f64) / last_update.elapsed().as_secs_f64()) as u64;
-                            bytes_since_last_update = 0;
-                            last_update = Instant::now();
-                        }
-                    }
+                    local_progress += len;
+                    local_part += len;
 
-                    // Throttle block (Global cross-adapter strategy)
-                    rate_limiter.wait_for_bytes(len).await;
+                    // Only lock the mutex every 500ms to avoid contention with ff_get_tasks
+                    if last_update.elapsed() > Duration::from_millis(500) {
+                        {
+                            let mut t = tasks.lock().await;
+                            if let Some(task) = t.get_mut(&id) {
+                                task.progress_bytes += local_progress;
+                                task.current_part_bytes += local_part;
+                                task.download_speed = ((bytes_since_last_update as f64) / last_update.elapsed().as_secs_f64()) as u64;
+                            }
+                        }
+                        local_progress = 0;
+                        local_part = 0;
+                        bytes_since_last_update = 0;
+                        last_update = Instant::now();
+                    }
                 }
+            }
+        }
+
+        // Flush any remaining bytes after stream ends
+        if local_progress > 0 {
+            let mut t = tasks.lock().await;
+            if let Some(task) = t.get_mut(&id) {
+                task.progress_bytes += local_progress;
+                task.current_part_bytes += local_part;
             }
         }
         
@@ -216,7 +249,12 @@ pub async fn start_download(
                 let _ = tokio::task::spawn_blocking(move || {
                     if let Ok(mut archive) = Archive::new(&path_str).open_for_processing() {
                         while let Ok(Some(header)) = archive.read_header() {
-                            if let Ok(next_archive) = header.extract_to(&dest) {
+                            let fname = header.entry().filename.clone();
+                            let dest_file = dest.join(fname);
+                            if let Some(parent) = dest_file.parent() {
+                                let _ = std::fs::create_dir_all(parent);
+                            }
+                            if let Ok(next_archive) = header.extract_to(&dest_file) {
                                 archive = next_archive;
                             } else {
                                 break;
@@ -260,6 +298,14 @@ pub async fn start_download(
                                     if let Some(end) = line[start + 7..].find('\"') {
                                         let exe = &line[start + 7..start + 7 + end];
                                         let full_exe = extract_to.join(exe.replace("\\", "/"));
+                                        
+                                        // Persist target executable for the UI layout
+                                        let target_exe = exe.replace("\\", "/");
+                                        let _ = std::fs::write(
+                                            extract_to.join("fg_setup_meta.json"),
+                                            serde_json::json!({ "target_executable": target_exe }).to_string()
+                                        );
+
                                         let mut t = tasks.lock().await;
                                         if let Some(task) = t.get_mut(&id) {
                                             task.executable_path = Some(full_exe.to_string_lossy().to_string());
@@ -271,20 +317,41 @@ pub async fn start_download(
                         }
                     }
 
-                    // Phase 4: Launch the installer
+                    // Phase 4: Launch the background installer automatically
+                    {
+                        let mut t = tasks.lock().await;
+                        if let Some(task) = t.get_mut(&id) {
+                            task.status = "installing".to_string();
+                        }
+                    }
+
+                    // Install specifically next to the raw repack stream to avoid overlapping dependencies
+                    let safe_slug = extract_to.file_name().unwrap_or_default().to_string_lossy();
+                    let target_install_dir = extract_to.parent().unwrap_or(std::path::Path::new("")).join(format!("{}_installed", safe_slug));
+
                     #[cfg(target_os = "windows")]
                     let child = std::process::Command::new(&setup_path)
                         .current_dir(&extract_to)
+                        .arg("/VERYSILENT")
+                        .arg("/SUPPRESSMSGBOXES")
+                        .arg("/NORESTART")
+                        .arg("/SP-")
+                        .arg(format!("/DIR={}", target_install_dir.to_string_lossy()))
                         .spawn();
 
                     #[cfg(not(target_os = "windows"))]
                     let child = std::process::Command::new("wine")
                         .arg(&setup_path)
+                        .arg("/VERYSILENT")
+                        .arg("/SUPPRESSMSGBOXES")
+                        .arg("/NORESTART")
+                        .arg("/SP-")
+                        .arg(format!("/DIR={}", target_install_dir.to_string_lossy()))
                         .current_dir(&extract_to)
                         .spawn();
 
                     if let Ok(mut c) = child {
-                        let _ = c.wait(); // Wait for user to finish installing
+                        let _ = c.wait(); // Block async routine dynamically while installer unpacks
                     }
                 }
             }
@@ -302,7 +369,7 @@ pub async fn start_download(
 }
 
 #[tauri::command]
-pub async fn ff_add_urls(id: String, game_slug: String, urls: Vec<String>, download_dir: Option<String>, state: State<'_, FuckingFastState>, rate_limiter: State<'_, Arc<GlobalRateLimiter>>) -> Result<bool, String> {
+pub async fn ff_add_urls(id: String, game_slug: String, urls: Vec<String>, download_dir: Option<String>, state: State<'_, FuckingFastState>) -> Result<bool, String> {
     let token = Arc::new(AtomicBool::new(false));
     let custom_dir = download_dir.clone().map(PathBuf::from);
     {
@@ -328,9 +395,8 @@ pub async fn ff_add_urls(id: String, game_slug: String, urls: Vec<String>, downl
     let t = state.tasks.clone();
     let c = state.client.clone();
     let d = state.download_dir.clone();
-    let r_limiter = Arc::clone(rate_limiter.inner());
     tokio::spawn(async move {
-        start_download(id, d, c, t, r_limiter).await;
+        start_download(id, d, c, t).await;
     });
 
     Ok(true)
@@ -348,7 +414,7 @@ pub async fn ff_pause(id: String, state: State<'_, FuckingFastState>) -> Result<
 }
 
 #[tauri::command]
-pub async fn ff_resume(id: String, state: State<'_, FuckingFastState>, rate_limiter: State<'_, Arc<GlobalRateLimiter>>) -> Result<(), String> {
+pub async fn ff_resume(id: String, state: State<'_, FuckingFastState>) -> Result<(), String> {
     let mut t = state.tasks.lock().await;
     if let Some(task) = t.get_mut(&id) {
         if task.status == "paused" || task.status == "error" || task.status == "extracting" {
@@ -358,11 +424,10 @@ pub async fn ff_resume(id: String, state: State<'_, FuckingFastState>, rate_limi
             let t_clone = state.tasks.clone();
             let c_clone = state.client.clone();
             let d_clone = state.download_dir.clone();
-            let r_limiter = Arc::clone(rate_limiter.inner());
             let safe_id = id.clone();
             
             tokio::spawn(async move {
-                start_download(safe_id, d_clone, c_clone, t_clone, r_limiter).await;
+                start_download(safe_id, d_clone, c_clone, t_clone).await;
             });
         }
     }

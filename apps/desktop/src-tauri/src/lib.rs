@@ -1,17 +1,74 @@
 use tauri::Manager;
 mod torrent;
 mod fuckingfast;
-mod rate_limiter;
+pub struct HttpClient(pub reqwest::Client);
 
 pub mod cmds {
+    use tauri::Manager;
+
     #[tauri::command]
     pub fn check_autostart_hidden() -> bool {
         std::env::args().any(|arg| arg == "--hidden")
     }
 
+    #[derive(serde::Serialize)]
+    pub struct DiskStatus {
+        pub active: bool,
+        pub setup_path: Option<String>,
+        pub executable_path: Option<String>,
+        pub meta_executable: Option<String>,
+    }
+
     #[tauri::command]
-    pub async fn set_download_speed_limit(limit_kbps: u64, rate_limiter: tauri::State<'_, std::sync::Arc<crate::rate_limiter::GlobalRateLimiter>>) -> Result<(), String> {
-        rate_limiter.limit_kbps.store(limit_kbps, std::sync::atomic::Ordering::SeqCst);
+    pub fn check_game_disk_status(slug: String, app_handle: tauri::AppHandle) -> DiskStatus {
+        let config_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| std::path::PathBuf::from("/tmp"));
+        let game_dir = config_dir.join("downloads").join(&slug);
+
+        if !game_dir.exists() {
+            return DiskStatus { active: false, setup_path: None, executable_path: None, meta_executable: None };
+        }
+
+        let mut setup = None;
+        let mut exe = None;
+        let mut meta_target = None;
+
+        if let Ok(meta_bytes) = std::fs::read_to_string(game_dir.join("fg_setup_meta.json")) {
+            if let Ok(meta_json) = serde_json::from_str::<serde_json::Value>(&meta_bytes) {
+                if let Some(t_exe) = meta_json.get("target_executable").and_then(|v| v.as_str()) {
+                    meta_target = Some(t_exe.to_string());
+                }
+            }
+        }
+
+        if let Ok(entries) = std::fs::read_dir(&game_dir) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                if let Ok(file_name) = entry.file_name().into_string() {
+                    if file_name.to_lowercase() == "setup.exe" {
+                        setup = Some(entry.path().to_string_lossy().to_string());
+                    } else if file_name.to_lowercase().ends_with(".exe") && !file_name.to_lowercase().starts_with("unins") {
+                        if exe.is_none() {
+                            exe = Some(entry.path().to_string_lossy().to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        DiskStatus {
+            active: true,
+            setup_path: setup,
+            executable_path: exe,
+            meta_executable: meta_target,
+        }
+    }
+
+    #[tauri::command]
+    pub fn launch_file(path: String) -> Result<(), String> {
+        let parent_dir = std::path::Path::new(&path).parent().unwrap_or(std::path::Path::new(""));
+        std::process::Command::new(&path)
+            .current_dir(parent_dir)
+            .spawn()
+            .map_err(|e| e.to_string())?;
         Ok(())
     }
 }
@@ -20,16 +77,14 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent}
 
 #[allow(dead_code)]
 #[tauri::command]
-async fn native_fetch(url: String) -> Result<String, String> {
-    let client = reqwest::Client::builder().user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 fg-manager").build().unwrap();
-    client.get(&url).send().await.map_err(|e| e.to_string())?.text().await.map_err(|e| e.to_string())
+async fn native_fetch(url: String, http: tauri::State<'_, HttpClient>) -> Result<String, String> {
+    http.0.get(&url).send().await.map_err(|e| e.to_string())?.text().await.map_err(|e| e.to_string())
 }
 
 #[allow(dead_code)]
 #[tauri::command]
-async fn native_fetch_bytes(url: String) -> Result<Vec<u8>, String> {
-    let client = reqwest::Client::builder().user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 fg-manager").build().unwrap();
-    client.get(&url).send().await.map_err(|e| e.to_string())?.bytes().await.map_err(|e| e.to_string()).map(|b| b.to_vec())
+async fn native_fetch_bytes(url: String, http: tauri::State<'_, HttpClient>) -> Result<Vec<u8>, String> {
+    http.0.get(&url).send().await.map_err(|e| e.to_string())?.bytes().await.map_err(|e| e.to_string()).map(|b| b.to_vec())
 }
 
 #[tauri::command]
@@ -40,15 +95,13 @@ fn quit_app(app: tauri::AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
-    .on_window_event(|_window, event| {
-      // Workaround for known Tauri v2 + WebView2 stutter bug on Windows.
-      // The Resized event blocks the main thread causing rendering deadlock.
-      // A 1ms sleep breaks the contention between native window and WebView2 compositor.
-      if let tauri::WindowEvent::Resized(_) = event {
-        std::thread::sleep(std::time::Duration::from_millis(1));
-      }
-    })
-    .manage(std::sync::Arc::new(rate_limiter::GlobalRateLimiter::new()))
+    .manage(HttpClient(
+      reqwest::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 fg-manager")
+        .connect_timeout(std::time::Duration::from_secs(3))
+        .build()
+        .unwrap(),
+    ))
     .plugin(tauri_plugin_log::Builder::default().level(log::LevelFilter::Info).build())
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_http::init())
@@ -137,8 +190,9 @@ pub fn run() {
         fuckingfast::ff_resume,
         fuckingfast::ff_remove,
         fuckingfast::ff_get_tasks,
-        cmds::set_download_speed_limit,
         cmds::check_autostart_hidden,
+        cmds::check_game_disk_status,
+        cmds::launch_file,
         native_fetch,
         native_fetch_bytes,
         quit_app

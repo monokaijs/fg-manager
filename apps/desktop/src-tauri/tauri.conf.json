@@ -31,7 +31,7 @@
         "decorations": false,
         "transparent": false,
         "visible": false,
-        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --ignore-gpu-blocklist --enable-gpu-rasterization --enable-zero-copy"
+        "additionalBrowserArgs": "--disable-features=CalculateNativeWinOcclusion,msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-smooth-scrolling --enable-gpu-rasterization --ignore-gpu-blocklist --force-color-profile=srgb"
       }
     ],
     "security": {

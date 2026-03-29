@@ -113,68 +113,71 @@ pub async fn torrent_add_url(url: String, game_slug: Option<String>, download_di
 #[tauri::command]
 pub async fn torrent_get_tasks(state: State<'_, TorrentState>) -> Result<Vec<serde_json::Value>, String> {
     let slugs = state.slugs.lock().await.clone();
+    let session = state.session.clone();
 
-    let tasks: Vec<serde_json::Value> = state.session.with_torrents(|torrents_iter| {
-        torrents_iter.map(|(_, handle)| {
-            let info_hash = handle.shared().info_hash.as_string();
-            let game_slug = slugs.get(&info_hash).cloned();
-            
-            let stats = handle.stats();
-            
-            let status = if stats.finished {
-                "completed"
-            } else {
-                match stats.state.to_string().as_str() {
-                    "initializing" => "checking",
-                    "live" => "downloading",
-                    "paused" => "paused",
-                    _ => "error",
+    tokio::task::spawn_blocking(move || {
+        let tasks: Vec<serde_json::Value> = session.with_torrents(|torrents_iter| {
+            torrents_iter.map(|(_, handle)| {
+                let info_hash = handle.shared().info_hash.as_string();
+                let game_slug = slugs.get(&info_hash).cloned();
+                
+                let stats = handle.stats();
+                
+                let status = if stats.finished {
+                    "completed"
+                } else {
+                    match stats.state.to_string().as_str() {
+                        "initializing" => "checking",
+                        "live" => "downloading",
+                        "paused" => "paused",
+                        _ => "error",
+                    }
+                };
+
+                let progress = if stats.total_bytes > 0 {
+                    (stats.progress_bytes as f64) / (stats.total_bytes as f64)
+                } else {
+                    0.0
+                };
+
+                let mut download_speed = 0u64;
+                let mut upload_speed = 0u64;
+                let mut eta = 0u64;
+                let mut peers = 0u32;
+                let mut seeds = 0u32;
+
+                if let Some(live) = stats.live {
+                    download_speed = (live.download_speed.mbps * 1024.0 * 1024.0) as u64;
+                    upload_speed = (live.upload_speed.mbps * 1024.0 * 1024.0) as u64;
+                    peers = live.snapshot.peer_stats.live as u32;
+                    seeds = live.snapshot.peer_stats.seen as u32;
                 }
-            };
 
-            let progress = if stats.total_bytes > 0 {
-                (stats.progress_bytes as f64) / (stats.total_bytes as f64)
-            } else {
-                0.0
-            };
+                if download_speed > 0 && stats.total_bytes > stats.progress_bytes {
+                    eta = (stats.total_bytes - stats.progress_bytes) / download_speed;
+                }
 
-            let mut download_speed = 0u64;
-            let mut upload_speed = 0u64;
-            let mut eta = 0u64;
-            let mut peers = 0u32;
-            let mut seeds = 0u32;
+                let name_fallback = handle.name().map(|n| n.to_owned()).or(game_slug.clone()).unwrap_or_else(|| format!("Torrent {}", info_hash));
 
-            if let Some(live) = stats.live {
-                download_speed = (live.download_speed.mbps * 1024.0 * 1024.0) as u64;
-                upload_speed = (live.upload_speed.mbps * 1024.0 * 1024.0) as u64;
-                peers = live.snapshot.peer_stats.live as u32;
-                seeds = live.snapshot.peer_stats.seen as u32;
-            }
+                serde_json::json!({
+                    "id": info_hash,
+                    "gameSlug": game_slug,
+                    "name": name_fallback,
+                    "status": status,
+                    "progress": progress,
+                    "downloadSpeed": download_speed,
+                    "uploadSpeed": upload_speed,
+                    "eta": eta,
+                    "totalSize": stats.total_bytes,
+                    "downloaded": stats.progress_bytes,
+                    "peers": peers,
+                    "seeds": seeds,
+                })
+            }).collect()
+        });
 
-            if download_speed > 0 && stats.total_bytes > stats.progress_bytes {
-                eta = (stats.total_bytes - stats.progress_bytes) / download_speed;
-            }
-
-            let name_fallback = handle.name().map(|n| n.to_owned()).or(game_slug.clone()).unwrap_or_else(|| format!("Torrent {}", info_hash));
-
-            serde_json::json!({
-                "id": info_hash,
-                "gameSlug": game_slug,
-                "name": name_fallback,
-                "status": status,
-                "progress": progress,
-                "downloadSpeed": download_speed,
-                "uploadSpeed": upload_speed,
-                "eta": eta,
-                "totalSize": stats.total_bytes,
-                "downloaded": stats.progress_bytes,
-                "peers": peers,
-                "seeds": seeds,
-            })
-        }).collect()
-    });
-
-    Ok(tasks)
+        Ok(tasks)
+    }).await.unwrap_or_else(|_| Err("Failed to spawn background blocking thread".to_string()))
 }
 
 #[tauri::command]

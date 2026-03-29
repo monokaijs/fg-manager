@@ -40,10 +40,9 @@ export default function GamesCatalog({ filter }: { filter?: "favorites" | "recen
   }, [games, favorites, searchQuery, filter, decodedTitles]);
 
   return (
-    <>
+    <div className="flex flex-col h-full overflow-hidden">
       <header
-        data-tauri-drag-region
-        className="flex h-16 shrink-0 items-center justify-between px-8 border-b border-border bg-background z-50 sticky top-0 transition-[padding] duration-200"
+        className="flex h-16 shrink-0 items-center justify-between px-8 border-b border-border bg-background z-50 relative"
       >
         <div className="flex items-center space-x-4">
           <SidebarTrigger />
@@ -101,7 +100,7 @@ export default function GamesCatalog({ filter }: { filter?: "favorites" | "recen
         </div>
       </header>
 
-      <div className="p-8">
+      <div className="flex-1 overflow-y-auto p-8" style={{ willChange: 'scroll-position', transform: 'translateZ(0)', scrollBehavior: 'smooth' }}>
         <div className="grid gap-6">
           {viewMode === "grid" ? (
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
@@ -118,6 +117,6 @@ export default function GamesCatalog({ filter }: { filter?: "favorites" | "recen
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 }

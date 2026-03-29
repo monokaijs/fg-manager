@@ -24,9 +24,7 @@ export default function App() {
 
     // Autostart logic
     invoke<boolean>("check_autostart_hidden").then((isHiddenArg) => {
-        const { hideOnStartup, downloadSpeedLimit } = useSettingsStore.getState();
-        // Sync download limit
-        invoke('set_download_speed_limit', { limitKbps: downloadSpeedLimit }).catch(console.error);
+        const { hideOnStartup } = useSettingsStore.getState();
 
         if (isHiddenArg && hideOnStartup) {
              getCurrentWindow().hide();
@@ -88,9 +86,37 @@ export default function App() {
       unlistenClose = unlisten;
     });
 
+    // Nuke pointer events globally on scroll to prevent main-thread hit-test collision
+    let scrollTimer: ReturnType<typeof setTimeout>;
+    const handleScroll = () => {
+      document.body.style.pointerEvents = 'none';
+      clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(() => { document.body.style.pointerEvents = ''; }, 150);
+    };
+    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+
+    // WINDOWS 11 180HZ TIMER RESOLUTION HACK:
+    // Forces Chromium Edge to maintain a 1ms system timer precision instead of 
+    // dynamically downclocking to 15.6ms (which causes 180hz VSync tearing).
+    let audioCtx: AudioContext | null = null;
+    try {
+       audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+       const osc = audioCtx.createOscillator();
+       osc.frequency.setValueAtTime(0, audioCtx.currentTime); // 0Hz (Silent frequency)
+       const gainNode = audioCtx.createGain();
+       gainNode.gain.value = 0; // Pure mathematical silence
+       osc.connect(gainNode);
+       gainNode.connect(audioCtx.destination);
+       osc.start();
+       audioCtx.resume();
+    } catch(e) {}
+
     return () => {
       if (unlistenResize) unlistenResize();
       if (unlistenClose) unlistenClose();
+      window.removeEventListener('scroll', handleScroll, { capture: true });
+      clearTimeout(scrollTimer);
+      if (audioCtx) audioCtx.close();
     };
   }, [initDB]);
 
@@ -98,7 +124,9 @@ export default function App() {
     <Router>
       <SidebarProvider className="font-sans h-full w-full overflow-hidden">
         <AppSidebar />
-        <SidebarInset className="bg-background relative flex-1 overflow-y-auto overflow-x-hidden h-full flex-col">
+        <SidebarInset 
+          className="bg-background relative flex-1 flex-col h-full overflow-hidden"
+        >
           <Routes>
             <Route path="/library" element={<LibraryView />} />
             <Route path="/games" element={<GamesCatalog />} />

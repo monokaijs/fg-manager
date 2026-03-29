@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { enable, disable } from '@tauri-apps/plugin-autostart';
-import { invoke } from '@tauri-apps/api/core';
 
 interface SettingsState {
   qbUrl: string;
@@ -42,10 +41,7 @@ export const useSettingsStore = create<SettingsState>()(
       hideOnStartup: false,
       setHideOnStartup: (val) => set({ hideOnStartup: val }),
       downloadSpeedLimit: 0,
-      setDownloadSpeedLimit: (val) => {
-        set({ downloadSpeedLimit: val });
-        invoke('set_download_speed_limit', { limitKbps: val }).catch(console.error);
-      },
+      setDownloadSpeedLimit: (val) => set({ downloadSpeedLimit: val }),
       minimizeToTrayOnClose: true,
       setMinimizeToTrayOnClose: (val) => set({ minimizeToTrayOnClose: val }),
     }),

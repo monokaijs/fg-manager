@@ -76,15 +76,21 @@ export const useDownloadStore = create<DownloadState>((set, get) => ({
   },
 
   addMagnet: async (magnet, slug) => {
-    return downloadManager.addMagnet(magnet, slug);
+    const success = await downloadManager.addMagnet(magnet, slug);
+    if (success) get().refreshTasks();
+    return success;
   },
 
   addTorrent: async (url, slug) => {
-    return downloadManager.addTorrent(url, slug);
+    const success = await downloadManager.addTorrent(url, slug);
+    if (success) get().refreshTasks();
+    return success;
   },
 
   addFastUrls: async (id, slug, urls) => {
-    return downloadManager.addFastUrls(id, slug, urls);
+    const success = await downloadManager.addFastUrls(id, slug, urls);
+    if (success) get().refreshTasks();
+    return success;
   },
 
   pause: async (id) => {
@@ -108,7 +114,7 @@ let pollTimer: ReturnType<typeof setTimeout> | null = null;
 function schedulePoll() {
   const tasks = useDownloadStore.getState().tasks;
   const hasActive = tasks.some(t => t.status === 'downloading' || t.status === 'checking' || t.status === 'extracting');
-  const interval = hasActive ? 3000 : 10000;
+  const interval = hasActive ? 3000 : 30000;
 
   pollTimer = setTimeout(async () => {
     await useDownloadStore.getState().refreshTasks();

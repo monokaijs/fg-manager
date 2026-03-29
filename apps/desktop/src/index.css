@@ -5,6 +5,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+html,
+body {
+  background-color: var(--background);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 #root {
   height: 100vh;
   width: 100vw;
@@ -17,21 +25,42 @@ html.maximized #root {
   box-shadow: none;
 }
 
-header, [data-sidebar="header"], [data-tauri-drag-region] {
+/* 
+ * Native Window Dragging for Frameless Tauri 
+ */
+[data-tauri-drag-region] {
   -webkit-app-region: drag;
 }
-
-button, a, input, select, textarea, [data-no-drag], [data-sidebar="menu"], [data-sidebar="menu-item"] {
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] a,
+[data-tauri-drag-region] div[role="button"],
+.cursor-pointer {
   -webkit-app-region: no-drag;
 }
 
+/* 
+ * Premium Mac-Style Shadcn Scrollbars 
+ */
 ::-webkit-scrollbar {
-  display: none;
+  width: 14px;
+  background: transparent;
 }
-
-* {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: rgba(150, 150, 150, 0.3);
+  border-radius: 9999px;
+  border: 4px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(150, 150, 150, 0.5);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 @theme {
@@ -252,3 +281,5 @@ a,
 button {
   cursor: pointer;
 }
+
+/* Removed content-visibility: auto as it causes compositor scroll stall */

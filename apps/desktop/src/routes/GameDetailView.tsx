@@ -9,7 +9,8 @@ import { useGamesStore } from "@/store/useGamesStore";
 import { useDownloadStore } from "@/stores/downloadStore";
 import { Progress } from "@/components/ui/progress";
 import { decodeHtml, formatBytes } from "@/lib/utils";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from '@tauri-apps/api/core';
+
 export default function GameDetailView() {
   const { slug } = useParams();
   const { favorites, toggleFavorite } = useGamesStore();
@@ -19,12 +20,32 @@ export default function GameDetailView() {
   const [selectedMediaUrl, setSelectedMediaUrl] = useState<string | null>(null);
   const [processingDownload, setProcessingDownload] = useState<boolean>(false);
 
+  type DiskStatus = {
+    active: boolean;
+    setup_path: string | null;
+    executable_path: string | null;
+    meta_executable: string | null;
+  };
+  const [diskStatus, setDiskStatus] = useState<DiskStatus | null>(null);
+
   useEffect(() => {
     invoke<string>('native_fetch', { url: `https://games-cdn.xomnghien.com/posts/${slug}.json` })
       .then(resText => JSON.parse(resText))
       .then(d => { setData(d); setLoading(false); })
       .catch(err => { console.error(err); setLoading(false); });
   }, [slug]);
+
+  const activeTask = tasks.find(t => t.gameSlug === slug && t.status !== 'completed' && t.status !== 'error');
+
+  useEffect(() => {
+    if (!activeTask && slug) {
+      invoke<DiskStatus>('check_game_disk_status', { slug })
+        .then(res => setDiskStatus(res))
+        .catch(console.error);
+    } else {
+      setDiskStatus(null);
+    }
+  }, [activeTask, slug]);
 
   if (loading) return (
     <div className="p-8 flex flex-col items-center justify-center h-full">
@@ -42,20 +63,20 @@ export default function GameDetailView() {
 
   const heroImage = data.postImage || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop";
   const currentMedia = selectedMediaUrl || data?.screenshotImages?.[0];
-  const activeTask = tasks.find(t => t.gameSlug === slug);
 
   return (
-    <div className="relative min-h-[120vh] pb-[25vh]">
-      {/* Absolute Header Gradient */}
-      <div className="absolute inset-x-0 top-0 h-96 z-0 overflow-hidden">
+    <div className="flex flex-col h-full overflow-hidden w-full">
+      <div className="flex-1 overflow-y-auto relative w-full h-full" style={{ willChange: 'scroll-position', transform: 'translateZ(0)' }}>
+        <div className="relative min-h-[120vh] pb-[25vh] w-full">
+          {/* Absolute Header Gradient */}
+          <div className="absolute inset-x-0 top-0 h-96 z-0 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background z-10" />
         <img loading="lazy" decoding="async" src={heroImage} className="w-full h-full object-cover opacity-20 scale-105" alt="Blur bg" />
       </div>
 
       <div className="relative z-10 block">
         <header
-          data-tauri-drag-region
-          className="flex h-16 items-center px-8 border-b border-border bg-background sticky top-0 transition-[padding] duration-200 z-50"
+          className="flex h-16 items-center px-8 border-b border-border bg-background sticky top-0 z-50"
         >
           <Link to="/games" className="mr-4 text-muted-foreground hover:text-foreground transition-colors flex items-center z-10">
             <ArrowLeft className="w-5 h-5 mr-2" /> Back to Catalog
@@ -138,9 +159,39 @@ export default function GameDetailView() {
           </div>
 
           {/* Steam-Style Action Bar */}
-          <div className="bg-card w-full mb-8 rounded px-6 py-5 flex flex-col md:flex-row items-center justify-end shadow-sm border border-border">
-            <div className="flex items-center gap-3">
-              {(() => {
+          <div className="bg-card w-full mb-8 rounded px-6 py-5 flex flex-col md:flex-row items-center justify-between shadow-sm border border-border">
+            {diskStatus?.active && !activeTask ? (
+              <div className="flex-1">
+                 <div className="flex items-center gap-3 mb-1">
+                   <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
+                     <Play className="w-4 h-4 text-green-500" />
+                   </div>
+                   <h3 className="text-lg font-bold">Ready to Install</h3>
+                 </div>
+                 <p className="text-sm text-muted-foreground ml-11">
+                   {diskStatus.meta_executable 
+                     ? `Installer target detected: ${diskStatus.meta_executable.split('/').pop()?.split('\\').pop()}` 
+                     : (diskStatus.setup_path ? "Setup wizard downloaded and ready." : "Extracted binaries are ready.")}
+                 </p>
+              </div>
+            ) : (
+              <div className="flex-1" />
+            )}
+
+            <div className="flex items-center gap-3 mt-4 md:mt-0">
+              {diskStatus?.active && !activeTask ? (
+                <Button 
+                   onClick={() => invoke('launch_file', { path: diskStatus.setup_path || diskStatus.executable_path })}
+                   size="lg" 
+                   className="font-bold px-8 shadow-green-500/20 shadow-lg text-white group" 
+                   variant="default"
+                   style={{ backgroundColor: '#22c55e', color: '#fff' }}
+                >
+                  <Play className="w-5 h-5 mr-2 group-hover:scale-110 transition-transform" fill="currentColor" />
+                  {diskStatus.setup_path ? "Launch Setup" : "Play Local"}
+                </Button>
+              ) : (
+              (() => {
                 const magnetLink = data.torrentLinks?.find((t: any) => t.type === 'magnet' || t.url?.startsWith('magnet:'))?.url;
                 const torrentFile = data.torrentLinks?.find((t: any) => t.type?.toLowerCase().includes('torrent') && !t.type?.toLowerCase().includes('magnet'))?.url;
                 const fuckingFastMirror = data.downloadCollections?.find((col: any) => col.host.toLowerCase().replace(/\s/g, '').includes('fuckingfast'));
@@ -216,7 +267,8 @@ export default function GameDetailView() {
                 ) : (
                   <Button disabled className="px-6 py-5 h-auto font-bold opacity-50">Unavailable</Button>
                 );
-              })()}
+              })()
+              )}
               <Button onClick={() => slug && toggleFavorite(slug)} variant={slug && favorites.includes(slug) ? "default" : "secondary"} className="px-6 py-5 h-auto relative font-semibold">
                 <Star className={`w-4 h-4 mr-2 ${slug && favorites.includes(slug) ? 'fill-current text-primary-foreground' : ''}`} /> {slug && favorites.includes(slug) ? "Wishlisted" : "Add to Wishlist"}
               </Button>
@@ -357,6 +409,8 @@ export default function GameDetailView() {
               )}
             </div>
           </div>
+        </div>
+      </div>
         </div>
       </div>
     </div>

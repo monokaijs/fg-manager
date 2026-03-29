@@ -107,12 +107,20 @@ class DownloadManager {
   }
 
   async getTasks(): Promise<DownloadTask[]> {
-    const unifiedTasks: DownloadTask[] = [];
+    // Check availability first (uses cache, fast)
+    const available: DownloaderAdapter[] = [];
     for (const adapter of this.adapters) {
       if (await this.isAdapterAvailable(adapter)) {
-         const tasks = await adapter.getTasks();
-         unifiedTasks.push(...tasks);
+        available.push(adapter);
       }
+    }
+    // Poll all available adapters in PARALLEL to avoid serial IPC blocking
+    const results = await Promise.allSettled(
+      available.map(a => a.getTasks())
+    );
+    const unifiedTasks: DownloadTask[] = [];
+    for (const r of results) {
+      if (r.status === 'fulfilled') unifiedTasks.push(...r.value);
     }
     return unifiedTasks;
   }

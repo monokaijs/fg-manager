@@ -94,16 +94,16 @@ export default function SettingsView() {
   };
 
   return (
-    <>
+    <div className="flex flex-col h-full overflow-hidden">
       <header
-        data-tauri-drag-region
-        className="flex h-16 shrink-0 items-center px-8 border-b border-border bg-background z-50 sticky top-0 transition-[padding] duration-200"
+        className="flex h-16 shrink-0 items-center px-8 border-b border-border bg-background z-50 relative"
       >
         <SidebarTrigger className="mr-4" />
         <h2 className="text-lg font-semibold tracking-tight">System Settings</h2>
       </header>
       
-      <div className="p-8 max-w-4xl space-y-12 pb-24 mx-auto w-full">
+      <div className="flex-1 overflow-y-auto p-8 w-full" style={{ willChange: 'scroll-position', transform: 'translateZ(0)', scrollBehavior: 'smooth' }}>
+        <div className="max-w-4xl space-y-12 pb-24 mx-auto w-full">
 
         {/* System Autostart */}
         <section className="space-y-4">
@@ -150,9 +150,11 @@ export default function SettingsView() {
           </p>
           <div className="flex items-center space-x-3 bg-card p-4 rounded-xl border border-border shadow-sm max-w-2xl">
             <FolderOpen className="w-8 h-8 opacity-20 mr-2 shrink-0" />
-            <div className="flex-1 w-full truncate">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/60">Primary Library Path</span>
-                <Input disabled value={displayPath || ""} className="bg-transparent border-0 opacity-100 placeholder:text-muted-foreground font-mono text-sm focus-visible:ring-0 p-0 h-auto shadow-none truncate" />
+            <div className="flex-1 w-full truncate flex flex-col justify-center space-y-0.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Primary Library Path</span>
+                <div className="font-mono text-sm text-foreground truncate w-full" title={displayPath || "No path set"}>
+                   {displayPath || "No path set"}
+                </div>
             </div>
             <Button variant="outline" className="shrink-0 group relative overflow-hidden" onClick={openFolder}>
                 <span className="relative z-10 transition-colors">Change Path</span>
@@ -212,7 +214,8 @@ export default function SettingsView() {
            <p className="text-xs font-mono">v{version}</p>
            <Button variant="ghost" size="sm" onClick={handleCheckUpdate} className="h-6 text-[10px] uppercase tracking-wider">Check for Updates</Button>
         </div>
+        </div>
       </div>
-    </>
+    </div>
   );
 }
