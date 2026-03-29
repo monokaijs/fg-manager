@@ -47,7 +47,7 @@ export const GameCard = React.memo(function GameCard({ game, viewMode = "grid", 
       )}
       
       {task && (
-        <div className="absolute top-3 right-3 bg-background/80 backdrop-blur rounded-full p-0.5 z-30 flex items-center justify-center border border-primary/20 shadow-sm">
+        <div className="absolute top-3 right-3 bg-background/90 rounded-full p-0.5 z-30 flex items-center justify-center border border-primary/20 shadow-sm">
           <div className="relative w-8 h-8 flex items-center justify-center">
             <svg className="w-8 h-8 -rotate-90">
               <circle className="text-muted/30" strokeWidth="2.5" stroke="currentColor" fill="transparent" r="14" cx="16" cy="16" />
@@ -59,8 +59,8 @@ export const GameCard = React.memo(function GameCard({ game, viewMode = "grid", 
 
       <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/40 to-transparent z-10" />
       <div className="absolute bottom-4 left-4 right-4 z-20">
-        <h3 className="text-sm font-semibold leading-tight line-clamp-2 mb-1 shadow-background uppercase tracking-tight">{decodeHtml(game.title)}</h3>
-        <p className="text-xs text-muted-foreground bg-background/50 backdrop-blur w-fit px-1.5 py-0.5 rounded capitalize">
+        <h3 className="text-sm font-semibold leading-tight line-clamp-2 mb-1 shadow-background uppercase tracking-tight">{decodedTitle}</h3>
+        <p className="text-xs text-muted-foreground bg-background/80 w-fit px-1.5 py-0.5 rounded capitalize">
           {showStatus && task ? task.status : showStatus ? "Installed" : new Date(game.date).toLocaleDateString()}
         </p>
       </div>

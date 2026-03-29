@@ -26,7 +26,9 @@ export function CachedImage({ src, alt, className, fallback, ...props }: CachedI
     <img 
       src={error && fallback ? fallback : imgSrc} 
       alt={alt} 
-      className={className} 
+      className={className}
+      loading="lazy"
+      decoding="async" 
       onError={() => {
         if (!error) {
           setError(true);
