@@ -10,7 +10,7 @@ import { useDownloadStore } from "@/stores/downloadStore";
 import { Progress } from "@/components/ui/progress";
 import { decodeHtml, formatBytes } from "@/lib/utils";
 import { CachedImage } from "@/components/ui/cached-image";
-import { fetch } from "@tauri-apps/plugin-http";
+import { invoke } from "@tauri-apps/api/core";
 
 export default function GameDetailView() {
   const { slug } = useParams();
@@ -22,8 +22,8 @@ export default function GameDetailView() {
   const [processingDownload, setProcessingDownload] = useState<boolean>(false);
 
   useEffect(() => {
-    fetch(`https://games-cdn.xomnghien.com/posts/${slug}.json`)
-      .then(res => res.json())
+    invoke<string>('native_fetch', { url: `https://games-cdn.xomnghien.com/posts/${slug}.json` })
+      .then(resText => JSON.parse(resText))
       .then(d => { setData(d); setLoading(false); })
       .catch(err => { console.error(err); setLoading(false); });
   }, [slug]);

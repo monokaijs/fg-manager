@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { get, set } from 'idb-keyval';
-import { fetch } from '@tauri-apps/plugin-http';
+import { invoke } from '@tauri-apps/api/core';
 
-interface CachedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
+export interface CachedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src?: string;
   fallback?: string;
 }
@@ -31,15 +31,11 @@ export function CachedImage({ src, alt, className, fallback, ...props }: CachedI
           return;
         }
         
-        const response = await fetch(src);
-        if (response.ok) {
-          const blob = await response.blob();
-          await set(cacheKey, blob);
-          objectUrl = URL.createObjectURL(blob);
-          setImgSrc(objectUrl);
-        } else {
-          setImgSrc(src);
-        }
+        const responseBytes = await invoke<number[]>('native_fetch_bytes', { url: src });
+        const blob = new Blob([new Uint8Array(responseBytes)]);
+        await set(cacheKey, blob);
+        objectUrl = URL.createObjectURL(blob);
+        setImgSrc(objectUrl);
       } catch (err) {
         console.warn("Image caching failed, falling back to network:", err);
         setImgSrc(src);

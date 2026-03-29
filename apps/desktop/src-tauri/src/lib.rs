@@ -18,8 +18,19 @@ pub mod cmds {
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
-// ... keep original mod and cmds ...
+#[tauri::command]
+async fn native_fetch(url: String) -> Result<String, String> {
+    let client = reqwest::Client::builder().user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 fg-manager").build().unwrap();
+    client.get(&url).send().await.map_err(|e| e.to_string())?.text().await.map_err(|e| e.to_string())
+}
 
+#[tauri::command]
+async fn native_fetch_bytes(url: String) -> Result<Vec<u8>, String> {
+    let client = reqwest::Client::builder().user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 fg-manager").build().unwrap();
+    client.get(&url).send().await.map_err(|e| e.to_string())?.bytes().await.map_err(|e| e.to_string()).map(|b| b.to_vec())
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
     .manage(std::sync::Arc::new(rate_limiter::GlobalRateLimiter::new()))
@@ -112,7 +123,9 @@ pub fn run() {
         fuckingfast::ff_remove,
         fuckingfast::ff_get_tasks,
         cmds::set_download_speed_limit,
-        cmds::check_autostart_hidden
+        cmds::check_autostart_hidden,
+        native_fetch,
+        native_fetch_bytes
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

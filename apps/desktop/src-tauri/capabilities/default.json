@@ -16,7 +16,7 @@
     "dialog:default",
     {
       "identifier": "http:default",
-      "allow": [{ "url": "http://*/*" }, { "url": "https://*/*" }]
+      "allow": [{ "url": "https://**.xomnghien.com/**" }, { "url": "http://**" }, { "url": "https://**" }]
     }
   ]
 }

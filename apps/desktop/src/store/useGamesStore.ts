@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { get, set } from 'idb-keyval';
-import { fetch } from '@tauri-apps/plugin-http';
+import { invoke } from '@tauri-apps/api/core';
 
 export interface GameBrief {
   id: number;
@@ -44,21 +44,18 @@ export const useGamesStore = create<GamesState>((setStore, getStore) => ({
       ]);
       if (localFavorites) setStore({ favorites: localFavorites });
 
-      // Check remote version
-      const versionRes = await fetch('https://games-cdn.xomnghien.com/version.json');
-      if (!versionRes.ok) throw new Error("Failed to fetch version.json");
-      const remoteConfig = await versionRes.json();
+      // Check remote version using infallible native fetch
+      const versionResText = await invoke<string>('native_fetch', { url: 'https://games-cdn.xomnghien.com/version.json' });
+      const remoteConfig = JSON.parse(versionResText);
       
       if (localVersion === remoteConfig.version && localGames && Array.isArray(localGames) && localGames.length > 0) {
         setStore({ version: localVersion, games: localGames, isLoading: false });
-        // Background sync to be strictly safe? Nah, exact versioning means it is current.
         return;
       }
 
       // Fetch new catalog
-      const catalogRes = await fetch('https://games-cdn.xomnghien.com/catalog.json');
-      if (!catalogRes.ok) throw new Error("Failed to fetch catalog.json");
-      const catalogData = await catalogRes.json();
+      const catalogResText = await invoke<string>('native_fetch', { url: 'https://games-cdn.xomnghien.com/catalog.json' });
+      const catalogData = JSON.parse(catalogResText);
       
       // Handle both the old raw Array format and the new structured version format seamlessly
       let finalGames = [];
