@@ -40,6 +40,14 @@ fn quit_app(app: tauri::AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .on_window_event(|_window, event| {
+      // Workaround for known Tauri v2 + WebView2 stutter bug on Windows.
+      // The Resized event blocks the main thread causing rendering deadlock.
+      // A 1ms sleep breaks the contention between native window and WebView2 compositor.
+      if let tauri::WindowEvent::Resized(_) = event {
+        std::thread::sleep(std::time::Duration::from_millis(1));
+      }
+    })
     .manage(std::sync::Arc::new(rate_limiter::GlobalRateLimiter::new()))
     .plugin(tauri_plugin_log::Builder::default().level(log::LevelFilter::Info).build())
     .plugin(tauri_plugin_dialog::init())
