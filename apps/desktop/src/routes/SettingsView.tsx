@@ -8,6 +8,8 @@ import { appDataDir, join } from "@tauri-apps/api/path";
 import { toast } from "sonner";
 import { HardDrive, Network, RotateCcw, FolderOpen } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { getVersion } from "@tauri-apps/api/app";
+import { check } from "@tauri-apps/plugin-updater";
 
 export default function SettingsView() {
   const { 
@@ -39,6 +41,27 @@ export default function SettingsView() {
       setDisplayPath(downloadPath);
     }
   }, [downloadPath]);
+
+  const [version, setVersion] = useState("");
+  useEffect(() => {
+     getVersion().then(setVersion).catch(() => setVersion("Unknown"));
+  }, []);
+
+  const handleCheckUpdate = async () => {
+    const toastId = toast.loading("Checking for updates...");
+    try {
+      const update = await check();
+      if (update?.available) {
+        toast.success(`Update ${update.version} found! Downloading...`, { id: toastId });
+        await update.downloadAndInstall();
+        toast.success("Update installed! Restart application to apply.", { id: toastId, duration: Infinity });
+      } else {
+        toast.info("You are on the latest version.", { id: toastId });
+      }
+    } catch (e) {
+      toast.error("Failed to check for updates", { id: toastId });
+    }
+  };
 
   const handleSaveNetwork = () => {
     setQbConfig(localUrl, localUser, localPass);
@@ -185,6 +208,10 @@ export default function SettingsView() {
           </div>
         </section>
         
+        <div className="mt-12 flex flex-col items-center justify-center space-y-2 opacity-60 hover:opacity-100 transition-opacity">
+           <p className="text-xs font-mono">v{version}</p>
+           <Button variant="ghost" size="sm" onClick={handleCheckUpdate} className="h-6 text-[10px] uppercase tracking-wider">Check for Updates</Button>
+        </div>
       </div>
     </>
   );
