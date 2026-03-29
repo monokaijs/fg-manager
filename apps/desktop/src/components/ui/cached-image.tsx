@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { get, set } from 'idb-keyval';
+import { fetch } from '@tauri-apps/plugin-http';
 
 interface CachedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   src?: string;

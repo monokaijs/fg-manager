@@ -10,6 +10,7 @@ import { useDownloadStore } from "@/stores/downloadStore";
 import { Progress } from "@/components/ui/progress";
 import { decodeHtml, formatBytes } from "@/lib/utils";
 import { CachedImage } from "@/components/ui/cached-image";
+import { fetch } from "@tauri-apps/plugin-http";
 
 export default function GameDetailView() {
   const { slug } = useParams();

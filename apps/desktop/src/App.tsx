@@ -30,6 +30,8 @@ export default function App() {
 
         if (isHiddenArg && hideOnStartup) {
              getCurrentWindow().hide();
+        } else {
+             getCurrentWindow().show();
         }
     });
 

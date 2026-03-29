@@ -30,6 +30,7 @@
         "fullscreen": false,
         "decorations": false,
         "transparent": true,
+        "visible": false,
         "titleBarStyle": "Overlay"
       }
     ],

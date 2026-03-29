@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { get, set } from 'idb-keyval';
+import { fetch } from '@tauri-apps/plugin-http';
 
 export interface GameBrief {
   id: number;

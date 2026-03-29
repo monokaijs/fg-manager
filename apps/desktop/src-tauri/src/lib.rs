@@ -22,6 +22,7 @@ pub fn run() {
     .manage(std::sync::Arc::new(rate_limiter::GlobalRateLimiter::new()))
     .plugin(tauri_plugin_log::Builder::default().level(log::LevelFilter::Info).build())
     .plugin(tauri_plugin_dialog::init())
+    .plugin(tauri_plugin_http::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
     .setup(|app| {
