@@ -16,7 +16,12 @@ pub mod cmds {
     }
 }
 
-#[cfg_attr(mobile, tauri::mobile_entry_point)]
+use tauri::Manager;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{MouseButton, MouseState, TrayIconBuilder, TrayIconEvent};
+
+// ... keep original mod and cmds ...
+
 pub fn run() {
   tauri::Builder::default()
     .manage(std::sync::Arc::new(rate_limiter::GlobalRateLimiter::new()))
@@ -27,6 +32,40 @@ pub fn run() {
     .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec!["--hidden"])))
     .setup(|app| {
         let handle = app.handle().clone();
+
+        let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+        let show_i = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+        let menu = Menu::with_items(app, &[&show_i, &quit_i])?;
+
+        let _tray = TrayIconBuilder::new()
+            .icon(app.default_window_icon().unwrap().clone())
+            .menu(&menu)
+            .on_menu_event(|app, event| match event.id.as_ref() {
+                "quit" => {
+                    app.exit(0);
+                }
+                "show" => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+                _ => {}
+            })
+            .on_tray_icon_event(|tray, event| {
+                if let TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseState::Up,
+                    ..
+                } = event
+                {
+                    if let Some(window) = tray.app_handle().get_webview_window("main") {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+                }
+            })
+            .build(app)?;
         
         let config_dir = handle.path().app_data_dir().unwrap_or_else(|_| std::path::PathBuf::from("/tmp"));
         let downloads_dir = config_dir.join("downloads");
@@ -47,6 +86,12 @@ pub fn run() {
             }
         });
         Ok(())
+    })
+    .on_window_event(|window, event| {
+        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+            window.hide().unwrap_or_default();
+            api.prevent_close();
+        }
     })
     .invoke_handler(tauri::generate_handler![
         torrent::torrent_ping,
