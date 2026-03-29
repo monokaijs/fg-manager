@@ -184,8 +184,7 @@ export default function GameDetailView() {
               {diskStatus?.active && !activeTask ? (
                 <Button 
                    onClick={() => invoke('launch_file', { path: diskStatus.setup_path || diskStatus.executable_path })}
-                   size="lg" 
-                   className="font-bold px-8 shadow-green-500/20 shadow-lg text-white group" 
+                   className="font-bold px-8 py-5 h-auto shadow-green-500/20 shadow-lg text-white group text-base" 
                    variant="default"
                    style={{ backgroundColor: '#22c55e', color: '#fff' }}
                 >
