@@ -29,9 +29,8 @@
         "resizable": true,
         "fullscreen": false,
         "decorations": false,
-        "transparent": true,
-        "visible": false,
-        "titleBarStyle": "Overlay"
+        "transparent": false,
+        "visible": false
       }
     ],
     "security": {
