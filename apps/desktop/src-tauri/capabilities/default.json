@@ -13,7 +13,9 @@
     "core:window:allow-unmaximize",
     "core:window:allow-close",
     "core:window:allow-hide",
+    "core:window:allow-show",
     "core:window:allow-toggle-maximize",
+    "updater:default",
     "dialog:default",
     {
       "identifier": "http:default",
