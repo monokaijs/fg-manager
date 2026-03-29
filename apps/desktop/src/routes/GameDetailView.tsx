@@ -54,6 +54,8 @@ export default function GameDetailView() {
     if (diskStatus?.active && !diskStatus?.meta_executable && !activeTask && slug) {
       const { downloadPath } = useSettingsStore.getState();
       invoke('force_extract_meta', { slug, libraryPath: downloadPath })
+        .then(() => invoke<DiskStatus>('check_game_disk_status', { slug, libraryPath: downloadPath }))
+        .then(res => setDiskStatus(res))
         .catch(console.error);
     }
   }, [diskStatus?.active, diskStatus?.meta_executable, activeTask, slug]);

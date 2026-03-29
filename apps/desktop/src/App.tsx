@@ -95,28 +95,13 @@ export default function App() {
     };
     window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
 
-    // WINDOWS 11 180HZ TIMER RESOLUTION HACK:
-    // Forces Chromium Edge to maintain a 1ms system timer precision instead of 
-    // dynamically downclocking to 15.6ms (which causes 180hz VSync tearing).
-    let audioCtx: AudioContext | null = null;
-    try {
-       audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-       const osc = audioCtx.createOscillator();
-       osc.frequency.setValueAtTime(0, audioCtx.currentTime); // 0Hz (Silent frequency)
-       const gainNode = audioCtx.createGain();
-       gainNode.gain.value = 0; // Pure mathematical silence
-       osc.connect(gainNode);
-       gainNode.connect(audioCtx.destination);
-       osc.start();
-       audioCtx.resume();
-    } catch(e) {}
+
 
     return () => {
       if (unlistenResize) unlistenResize();
       if (unlistenClose) unlistenClose();
       window.removeEventListener('scroll', handleScroll, { capture: true });
       clearTimeout(scrollTimer);
-      if (audioCtx) audioCtx.close();
     };
   }, [initDB]);
 
