@@ -2,9 +2,14 @@ import type { DownloaderAdapter, DownloadTask } from '../types';
 
 import { useSettingsStore } from '../../../stores/settingsStore';
 
+import { invoke } from '@tauri-apps/api/core';
+
 export class QBittorrentAdapter implements DownloaderAdapter {
   id = 'qbittorrent';
   name = 'qBittorrent (Local)';
+
+  private isAvailableCached = false;
+  private lastCheckTime = 0;
 
   async init() {
     return this.isAvailable();
@@ -19,10 +24,23 @@ export class QBittorrentAdapter implements DownloaderAdapter {
   }
 
   async isAvailable(): Promise<boolean> {
+    const now = Date.now();
+    // Throttle check: 10s backoff if offline, 2s if online
+    const throttleMs = this.isAvailableCached ? 2000 : 10000;
+    if (now - this.lastCheckTime < throttleMs) {
+      return this.isAvailableCached;
+    }
+
+    this.lastCheckTime = now;
+    const { qbUrl } = useSettingsStore.getState();
+    const baseUrl = qbUrl.endsWith('/') ? qbUrl.slice(0, -1) : qbUrl;
     try {
-      const res = await this.safeFetch('/api/v2/app/version');
-      return res.ok;
+      // Use Rust IPC for GET requests to completely mask generic ERR_CONNECTION_REFUSED browser console spam
+      await invoke('native_fetch', { url: `${baseUrl}/api/v2/app/version` });
+      this.isAvailableCached = true;
+      return true;
     } catch (e) {
+      this.isAvailableCached = false;
       return false;
     }
   }
