@@ -156,7 +156,6 @@ pub mod cmds {
             None => return Ok(()),
         };
 
-        let mut extracted_exe = None;
         let extracted_exe = parse_target_executable_from_setup(&setup_path);
         
         if let Some(t_exe) = extracted_exe {

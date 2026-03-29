@@ -280,7 +280,7 @@ pub async fn start_download(
                 let mut setup_exe = None;
                 if let Ok(entries) = std::fs::read_dir(&extract_to) {
                     for entry in entries.filter_map(|e| e.ok()) {
-                        if entry.file_name() == "setup.exe" {
+                        if entry.file_name().to_string_lossy().to_lowercase() == "setup.exe" {
                             setup_exe = Some(entry.path());
                             break;
                         }
@@ -295,7 +295,6 @@ pub async fn start_download(
                         }
                     }
 
-                    let mut extracted_exe = None;
                     let extracted_exe = crate::cmds::parse_target_executable_from_setup(&setup_path);
 
                     if let Some(exe) = extracted_exe {
@@ -325,13 +324,12 @@ pub async fn start_download(
                     let target_install_dir = extract_to.parent().unwrap_or(std::path::Path::new("")).join(format!("{}_installed", safe_slug));
 
                     #[cfg(target_os = "windows")]
-                    let child = std::process::Command::new(&setup_path)
+                    let child = std::process::Command::new("powershell")
+                        .arg("-NoProfile")
+                        .arg("-WindowStyle").arg("Hidden")
+                        .arg("-Command")
+                        .arg(format!("Start-Process -FilePath '{}' -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/DIR=\"{}\"' -Verb RunAs -Wait", setup_path.to_string_lossy(), target_install_dir.to_string_lossy()))
                         .current_dir(&extract_to)
-                        .arg("/VERYSILENT")
-                        .arg("/SUPPRESSMSGBOXES")
-                        .arg("/NORESTART")
-                        .arg("/SP-")
-                        .arg(format!("/DIR={}", target_install_dir.to_string_lossy()))
                         .spawn();
 
                     #[cfg(not(target_os = "windows"))]
