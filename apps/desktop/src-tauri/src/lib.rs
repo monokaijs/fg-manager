@@ -15,10 +15,8 @@ pub mod cmds {
         Ok(())
     }
 }
-
-use tauri::Manager;
 use tauri::menu::{Menu, MenuItem};
-use tauri::tray::{MouseButton, MouseState, TrayIconBuilder, TrayIconEvent};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
 // ... keep original mod and cmds ...
 
@@ -55,7 +53,7 @@ pub fn run() {
             .on_tray_icon_event(|tray, event| {
                 if let TrayIconEvent::Click {
                     button: MouseButton::Left,
-                    button_state: MouseState::Up,
+                    button_state: MouseButtonState::Up,
                     ..
                 } = event
                 {
