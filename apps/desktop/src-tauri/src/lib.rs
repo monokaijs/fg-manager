@@ -1,6 +1,7 @@
 use tauri::Manager;
 mod torrent;
 mod fuckingfast;
+mod rate_limiter;
 
 #[tauri::command]
 pub fn check_autostart_hidden() -> bool {
@@ -10,6 +11,7 @@ pub fn check_autostart_hidden() -> bool {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
+    .manage(rate_limiter::GlobalRateLimiter::new())
     .plugin(tauri_plugin_log::Builder::default().level(log::LevelFilter::Info).build())
     .plugin(tauri_plugin_dialog::init())
     .plugin(tauri_plugin_updater::Builder::new().build())
@@ -50,9 +52,15 @@ pub fn run() {
         fuckingfast::ff_resume,
         fuckingfast::ff_remove,
         fuckingfast::ff_get_tasks,
-        fuckingfast::set_download_speed_limit,
+        set_download_speed_limit,
         check_autostart_hidden
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
+}
+
+#[tauri::command]
+pub async fn set_download_speed_limit(limit_kbps: u64, rate_limiter: tauri::State<'_, rate_limiter::GlobalRateLimiter>) -> Result<(), String> {
+    rate_limiter.limit_kbps.store(limit_kbps, std::sync::atomic::Ordering::SeqCst);
+    Ok(())
 }
