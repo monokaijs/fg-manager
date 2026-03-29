@@ -87,12 +87,6 @@ pub fn run() {
         });
         Ok(())
     })
-    .on_window_event(|window, event| {
-        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-            window.hide().unwrap_or_default();
-            api.prevent_close();
-        }
-    })
     .invoke_handler(tauri::generate_handler![
         torrent::torrent_ping,
         torrent::torrent_add_magnet,

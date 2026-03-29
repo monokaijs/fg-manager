@@ -67,6 +67,7 @@ export default function App() {
     // Track maximized state for border styling
     const win = getCurrentWindow();
     let unlistenResize: () => void;
+    let unlistenClose: () => void;
 
     const updateMaximizedClass = async () => {
       document.documentElement.classList.toggle('maximized', await win.isMaximized());
@@ -77,8 +78,19 @@ export default function App() {
       unlistenResize = unlisten;
     });
 
+    win.onCloseRequested((event) => {
+      const { minimizeToTrayOnClose } = useSettingsStore.getState();
+      if (minimizeToTrayOnClose) {
+        event.preventDefault();
+        win.hide();
+      }
+    }).then(unlisten => {
+      unlistenClose = unlisten;
+    });
+
     return () => {
       if (unlistenResize) unlistenResize();
+      if (unlistenClose) unlistenClose();
     };
   }, [initDB]);
 

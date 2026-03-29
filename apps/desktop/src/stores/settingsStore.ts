@@ -16,6 +16,8 @@ interface SettingsState {
   setHideOnStartup: (val: boolean) => void;
   downloadSpeedLimit: number; // in KB/s, 0 = unlimited
   setDownloadSpeedLimit: (val: number) => void;
+  minimizeToTrayOnClose: boolean;
+  setMinimizeToTrayOnClose: (val: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -44,6 +46,8 @@ export const useSettingsStore = create<SettingsState>()(
         set({ downloadSpeedLimit: val });
         invoke('set_download_speed_limit', { limitKbps: val }).catch(console.error);
       },
+      minimizeToTrayOnClose: true,
+      setMinimizeToTrayOnClose: (val) => set({ minimizeToTrayOnClose: val }),
     }),
     {
       name: 'fg-manager-settings',

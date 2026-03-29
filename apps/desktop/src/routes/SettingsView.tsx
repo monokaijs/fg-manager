@@ -15,7 +15,8 @@ export default function SettingsView() {
     downloadPath, setDownloadPath,
     startWithWindows, setStartWithWindows,
     hideOnStartup, setHideOnStartup,
-    downloadSpeedLimit, setDownloadSpeedLimit
+    downloadSpeedLimit, setDownloadSpeedLimit,
+    minimizeToTrayOnClose, setMinimizeToTrayOnClose
   } = useSettingsStore();
 
   const [displayPath, setDisplayPath] = useState(downloadPath || "Loading...");
@@ -104,6 +105,13 @@ export default function SettingsView() {
                 <p className="text-sm text-muted-foreground">Keep the window hidden to the system tray when auto-starting.</p>
               </div>
               <Switch checked={hideOnStartup} onCheckedChange={setHideOnStartup} disabled={!startWithWindows} />
+            </div>
+            <div className="flex items-center justify-between mt-4 border-t border-border/50 pt-4">
+              <div className="space-y-0.5">
+                <h4 className="text-base font-semibold">Minimize to Tray on Close</h4>
+                <p className="text-sm text-muted-foreground">When closing the manager, hide it to the system tray instead of exiting.</p>
+              </div>
+              <Switch checked={minimizeToTrayOnClose} onCheckedChange={setMinimizeToTrayOnClose} />
             </div>
           </div>
         </section>
