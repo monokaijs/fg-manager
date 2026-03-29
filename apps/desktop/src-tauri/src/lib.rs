@@ -34,9 +34,9 @@ pub mod cmds {
         }
 
         let mut final_dir = None;
-        for path in check_dirs {
+        for path in &check_dirs {
             if path.exists() {
-                final_dir = Some(path);
+                final_dir = Some(path.clone());
                 break;
             }
         }
