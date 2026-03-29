@@ -3,6 +3,14 @@
   "productName": "fg-manager",
   "version": "0.1.2",
   "identifier": "dev.creaton.fgmanager",
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJERjc1NjQ0NTg5RDAzRjgKUldUNEE1MVlSRmIzTFd0bGxtZG1pcUYybmdTbEVobXFXTVcvU1RERFpEU1d1SUtXdVd0bDhTVlgK",
+      "endpoints": [
+        "https://github.com/monokaijs/fg-manager/releases/latest/download/updater.json"
+      ]
+    }
+  },
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -31,6 +39,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": "all",
     "icon": [
       "icons/32x32.png",
