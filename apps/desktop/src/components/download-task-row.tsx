@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { formatBytes } from "@/lib/utils";
-import { CachedImage } from "@/components/ui/cached-image";
+
 import { type DownloadTask } from "@/lib/downloads/types";
 import { type GameBrief } from "@/store/useGamesStore";
 
@@ -24,7 +24,7 @@ export function DownloadTaskRow({ task, game, onPause, onResume, onRemove }: Dow
       <div className="flex justify-between items-start gap-4">
         <Link to={game ? `/games/view/${game.slug}` : "#"} className="flex gap-4 items-center flex-1 min-w-0 pr-4">
           {thumbnail ? (
-            <CachedImage src={thumbnail} alt={title} className="w-16 h-16 rounded object-cover flex-shrink-0 bg-muted" />
+            <img loading="lazy" decoding="async" src={thumbnail} alt={title} className="w-16 h-16 rounded object-cover flex-shrink-0 bg-muted" />
           ) : (
             <div className="w-16 h-16 rounded bg-muted flex items-center justify-center flex-shrink-0 text-muted-foreground/30">
               <ImageIcon className="w-8 h-8" />

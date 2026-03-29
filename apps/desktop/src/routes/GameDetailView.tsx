@@ -9,9 +9,7 @@ import { useGamesStore } from "@/store/useGamesStore";
 import { useDownloadStore } from "@/stores/downloadStore";
 import { Progress } from "@/components/ui/progress";
 import { decodeHtml, formatBytes } from "@/lib/utils";
-import { CachedImage } from "@/components/ui/cached-image";
 import { invoke } from "@tauri-apps/api/core";
-
 export default function GameDetailView() {
   const { slug } = useParams();
   const { favorites, toggleFavorite } = useGamesStore();
@@ -51,7 +49,7 @@ export default function GameDetailView() {
       {/* Absolute Header Gradient */}
       <div className="absolute inset-x-0 top-0 h-96 z-0 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/80 to-background z-10" />
-        <CachedImage src={heroImage} className="w-full h-full object-cover opacity-30 blur-sm scale-105" alt="Blur bg" />
+        <img loading="lazy" decoding="async" src={heroImage} className="w-full h-full object-cover opacity-30 blur-sm scale-105" alt="Blur bg" />
       </div>
 
       <div className="relative z-10 block">
@@ -79,7 +77,7 @@ export default function GameDetailView() {
             <div className="w-full lg:w-2/3 flex flex-col gap-2">
               <div className="w-full rounded bg-black relative aspect-video shadow-md overflow-hidden">
                 {currentMedia ? (
-                  <CachedImage src={currentMedia} alt={decodeHtml(data.title)} className="w-full h-full object-contain" />
+                  <img loading="lazy" decoding="async" src={currentMedia} alt={decodeHtml(data.title)} className="w-full h-full object-contain" />
                 ) : (
                   <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground">No Media</div>
                 )}
@@ -94,7 +92,7 @@ export default function GameDetailView() {
                       onClick={() => setSelectedMediaUrl(src)}
                       className={`shrink-0 h-[68px] aspect-video overflow-hidden cursor-pointer transition-all rounded ${currentMedia === src ? 'ring-2 ring-primary ring-offset-1 ring-offset-background' : 'opacity-70 hover:opacity-100'}`}
                     >
-                      <CachedImage src={src} className="w-full h-full object-cover" />
+                      <img loading="lazy" decoding="async" src={src} className="w-full h-full object-cover" />
                     </div>
                   ))}
                 </div>
@@ -105,7 +103,7 @@ export default function GameDetailView() {
             <div className="w-full lg:w-1/3 flex flex-col">
               <div className="w-full rounded overflow-hidden shadow-sm mb-3">
                 {data.postImage ? (
-                  <CachedImage src={data.postImage} alt="Cover" className="w-full h-full aspect-[4/3] object-cover object-top bg-muted/20" />
+                  <img loading="lazy" decoding="async" src={data.postImage} alt="Cover" className="w-full h-full aspect-[4/3] object-cover object-top bg-muted/20" />
                 ) : null}
               </div>
 

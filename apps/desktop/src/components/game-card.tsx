@@ -1,6 +1,5 @@
 import { Link } from "react-router-dom";
 import { decodeHtml } from "@/lib/utils";
-import { CachedImage } from "@/components/ui/cached-image";
 import { useDownloadStore } from "@/stores/downloadStore";
 import React, { useMemo } from 'react';
 import { type GameBrief } from "@/store/useGamesStore";
@@ -20,7 +19,7 @@ export const GameCard = React.memo(function GameCard({ game, viewMode = "grid", 
     return (
       <Link to={`/games/view/${game.slug}`} className="flex items-center space-x-4 p-3 rounded-lg border border-border/50 bg-muted/10 hover:bg-muted/30 hover:border-border transition-colors cursor-pointer group">
         <div className="w-20 h-10 bg-muted/50 rounded overflow-hidden shrink-0 object-cover relative">
-          {game.postImage && <CachedImage src={game.postImage} alt={decodedTitle} className="w-full h-full object-cover" />}
+          {game.postImage && <img loading="lazy" decoding="async" src={game.postImage} alt={decodedTitle} className="w-full h-full object-cover" />}
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-sm font-medium truncate">{decodedTitle}</h3>
@@ -41,7 +40,7 @@ export const GameCard = React.memo(function GameCard({ game, viewMode = "grid", 
   return (
     <Link to={`/games/view/${game.slug}`} className="group relative aspect-[3/4] rounded-xl bg-muted/30 border border-border/50 overflow-hidden transition-all hover:shadow-xl hover:shadow-primary/5 cursor-pointer flex flex-col">
       {game.postImage ? (
-        <CachedImage src={game.postImage} alt={decodedTitle} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <img loading="lazy" decoding="async" src={game.postImage} alt={decodedTitle} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
       ) : (
         <div className="absolute inset-0 bg-muted flex items-center justify-center">No Image</div>
       )}
