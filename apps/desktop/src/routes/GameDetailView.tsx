@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useGamesStore } from "@/store/useGamesStore";
 import { useDownloadStore } from "@/stores/downloadStore";
 import { Progress } from "@/components/ui/progress";
-import { decodeHtml } from "@/lib/utils";
+import { decodeHtml, formatBytes } from "@/lib/utils";
 import { CachedImage } from "@/components/ui/cached-image";
 
 export default function GameDetailView() {
@@ -44,14 +44,6 @@ export default function GameDetailView() {
   const heroImage = data.postImage || "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=2070&auto=format&fit=crop";
   const currentMedia = selectedMediaUrl || data?.screenshotImages?.[0];
   const activeTask = tasks.find(t => t.gameSlug === slug);
-
-  const formatBytes = (bytes: number) => {
-    if (!bytes || bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
 
   return (
     <div className="relative min-h-[120vh] pb-[25vh]">

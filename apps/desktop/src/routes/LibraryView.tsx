@@ -2,10 +2,8 @@ import { HardDrive } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useDownloadStore } from "@/stores/downloadStore";
 import { useGamesStore } from "@/store/useGamesStore";
-import { Link } from "react-router-dom";
-import { decodeHtml } from "@/lib/utils";
 import { useMemo } from "react";
-import { CachedImage } from "@/components/ui/cached-image";
+import { GameCard } from "@/components/game-card";
 
 export default function LibraryView() {
   const { tasks } = useDownloadStore();
@@ -40,37 +38,9 @@ export default function LibraryView() {
       ) : (
         <div className="p-8">
           <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-            {libraryGames.map((game, i) => {
-              const task = tasks.find(t => t.gameSlug === game.slug);
-              return (
-                <Link to={`/games/view/${game.slug}`} key={i} className="group relative aspect-[3/4] rounded-xl bg-muted/30 border border-border/50 overflow-hidden transition-all hover:shadow-xl hover:shadow-primary/5 cursor-pointer flex flex-col">
-                  {game.postImage ? (
-                    <CachedImage src={game.postImage} alt={decodeHtml(game.title)} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                  ) : (
-                    <div className="absolute inset-0 bg-muted flex items-center justify-center">No Image</div>
-                  )}
-                  
-                  {task && (
-                    <div className="absolute top-3 right-3 bg-background/80 backdrop-blur rounded-full p-0.5 z-30 flex items-center justify-center border border-primary/20 shadow-sm">
-                      <div className="relative w-8 h-8 flex items-center justify-center">
-                        <svg className="w-8 h-8 -rotate-90">
-                          <circle className="text-muted/30" strokeWidth="2.5" stroke="currentColor" fill="transparent" r="14" cx="16" cy="16" />
-                          <circle className="text-primary transition-all duration-500" strokeWidth="2.5" strokeLinecap="round" stroke="currentColor" fill="transparent" r="14" cx="16" cy="16" strokeDasharray={`${task.progress * 87.96} 87.96`} />
-                        </svg>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="absolute inset-0 bg-gradient-to-t from-background/95 via-background/40 to-transparent z-10" />
-                  <div className="absolute bottom-4 left-4 right-4 z-20">
-                    <h3 className="text-sm font-semibold leading-tight line-clamp-2 mb-1 shadow-background uppercase tracking-tight">{decodeHtml(game.title)}</h3>
-                    <p className="text-xs text-muted-foreground bg-background/50 backdrop-blur w-fit px-1.5 py-0.5 rounded capitalize">
-                      {task ? task.status : "Installed"}
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
+            {libraryGames.map((game, i) => (
+              <GameCard key={i} game={game} viewMode="grid" showStatus={true} />
+            ))}
           </div>
         </div>
       )}
