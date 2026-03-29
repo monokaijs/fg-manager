@@ -141,34 +141,17 @@ pub mod cmds {
         };
 
         let mut extracted_exe = None;
-        if let Ok(bytes) = std::fs::read(&setup_path) {
-            let mut ascii = Vec::with_capacity(bytes.len() / 2);
-            for &b in &bytes {
-                if b >= 32 && b <= 126 {
-                    ascii.push(b);
-                }
-            }
-            if let Ok(text) = String::from_utf8(ascii) {
-                let mut offset = 0;
-                while let Some(start) = text[offset..].find("{app}\\") {
-                    let slice = &text[offset + start + 6 ..];
-                    if let Some(end) = slice.find(".exe") {
-                        let maybe_exe = &slice[..end + 4];
-                        let lower = maybe_exe.to_lowercase();
-                        if lower.len() < 100 
-                           && !lower.contains("dxwebsetup") 
-                           && !lower.contains("vcredist") 
-                           && !lower.contains("unins") 
-                           && !lower.contains("quicksfv") 
-                           && !lower.contains("md5") 
-                        {
-                            if !maybe_exe.contains("{") && !maybe_exe.contains("\"") && !maybe_exe.contains("?") && !maybe_exe.contains(">") {
-                                extracted_exe = Some(maybe_exe.replace("\\", "/"));
-                                break;
-                            }
+        let mut extracted_exe = None;
+        if let Ok(file) = std::fs::File::open(&setup_path) {
+            if let Ok(inno_info) = inno::Inno::new(file) {
+                for icon in inno_info.icons() {
+                    if let Some(target) = icon.filename() {
+                        let lower = target.to_lowercase();
+                        if lower.ends_with(".exe") && !lower.contains("unins") && !lower.contains("urldetect") && !lower.contains("url") {
+                            extracted_exe = Some(target.replace("{app}\\", "").replace("\\", "/"));
+                            break;
                         }
                     }
-                    offset += start + 6;
                 }
             }
         }
