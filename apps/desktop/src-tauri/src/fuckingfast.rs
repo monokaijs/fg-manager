@@ -273,12 +273,12 @@ pub async fn start_download(
 
                     // Phase 4: Launch the installer
                     #[cfg(target_os = "windows")]
-                    let mut child = std::process::Command::new(&setup_path)
+                    let child = std::process::Command::new(&setup_path)
                         .current_dir(&extract_to)
                         .spawn();
 
                     #[cfg(not(target_os = "windows"))]
-                    let mut child = std::process::Command::new("wine")
+                    let child = std::process::Command::new("wine")
                         .arg(&setup_path)
                         .current_dir(&extract_to)
                         .spawn();
@@ -302,7 +302,7 @@ pub async fn start_download(
 }
 
 #[tauri::command]
-pub async fn ff_add_urls(id: String, game_slug: String, urls: Vec<String>, download_dir: Option<String>, state: State<'_, FuckingFastState>, rate_limiter: State<'_, GlobalRateLimiter>) -> Result<bool, String> {
+pub async fn ff_add_urls(id: String, game_slug: String, urls: Vec<String>, download_dir: Option<String>, state: State<'_, FuckingFastState>, rate_limiter: State<'_, Arc<GlobalRateLimiter>>) -> Result<bool, String> {
     let token = Arc::new(AtomicBool::new(false));
     let custom_dir = download_dir.clone().map(PathBuf::from);
     {
@@ -348,7 +348,7 @@ pub async fn ff_pause(id: String, state: State<'_, FuckingFastState>) -> Result<
 }
 
 #[tauri::command]
-pub async fn ff_resume(id: String, state: State<'_, FuckingFastState>, rate_limiter: State<'_, GlobalRateLimiter>) -> Result<(), String> {
+pub async fn ff_resume(id: String, state: State<'_, FuckingFastState>, rate_limiter: State<'_, Arc<GlobalRateLimiter>>) -> Result<(), String> {
     let mut t = state.tasks.lock().await;
     if let Some(task) = t.get_mut(&id) {
         if task.status == "paused" || task.status == "error" || task.status == "extracting" {
