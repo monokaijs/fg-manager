@@ -19,6 +19,22 @@ pub mod cmds {
         pub meta_executable: Option<String>,
     }
 
+    pub fn parse_target_executable_from_setup(setup_path: &std::path::Path) -> Option<String> {
+        if let Ok(file) = std::fs::File::open(setup_path) {
+            if let Ok(inno_info) = inno::Inno::new(file) {
+                for icon in inno_info.icons() {
+                    if let Some(target) = icon.filename() {
+                        let lower = target.to_lowercase();
+                        if lower.ends_with(".exe") && !lower.contains("unins") && !lower.contains("urldetect") && !lower.contains("url") {
+                            return Some(target.replace("{app}\\", "").replace("\\", "/"));
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
     #[tauri::command]
     pub fn check_game_disk_status(slug: String, library_path: Option<String>, app_handle: tauri::AppHandle) -> DiskStatus {
         let config_dir = app_handle.path().app_data_dir().unwrap_or_else(|_| std::path::PathBuf::from("/tmp"));
@@ -141,20 +157,7 @@ pub mod cmds {
         };
 
         let mut extracted_exe = None;
-        let mut extracted_exe = None;
-        if let Ok(file) = std::fs::File::open(&setup_path) {
-            if let Ok(inno_info) = inno::Inno::new(file) {
-                for icon in inno_info.icons() {
-                    if let Some(target) = icon.filename() {
-                        let lower = target.to_lowercase();
-                        if lower.ends_with(".exe") && !lower.contains("unins") && !lower.contains("urldetect") && !lower.contains("url") {
-                            extracted_exe = Some(target.replace("{app}\\", "").replace("\\", "/"));
-                            break;
-                        }
-                    }
-                }
-            }
-        }
+        let extracted_exe = parse_target_executable_from_setup(&setup_path);
         
         if let Some(t_exe) = extracted_exe {
             let _ = std::fs::write(

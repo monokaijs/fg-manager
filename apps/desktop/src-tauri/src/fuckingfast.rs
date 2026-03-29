@@ -296,20 +296,7 @@ pub async fn start_download(
                     }
 
                     let mut extracted_exe = None;
-                    let mut extracted_exe = None;
-                    if let Ok(file) = std::fs::File::open(&setup_path) {
-                        if let Ok(inno_info) = inno::Inno::new(file) {
-                            for icon in inno_info.icons() {
-                                if let Some(target) = icon.filename() {
-                                    let lower = target.to_lowercase();
-                                    if lower.ends_with(".exe") && !lower.contains("unins") && !lower.contains("urldetect") && !lower.contains("url") {
-                                        extracted_exe = Some(target.replace("{app}\\", "").replace("\\", "/"));
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    let extracted_exe = crate::cmds::parse_target_executable_from_setup(&setup_path);
 
                     if let Some(exe) = extracted_exe {
                         let target_exe = exe.replace("\\", "/");
