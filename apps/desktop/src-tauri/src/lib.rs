@@ -18,16 +18,23 @@ pub mod cmds {
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 
+#[allow(dead_code)]
 #[tauri::command]
 async fn native_fetch(url: String) -> Result<String, String> {
     let client = reqwest::Client::builder().user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 fg-manager").build().unwrap();
     client.get(&url).send().await.map_err(|e| e.to_string())?.text().await.map_err(|e| e.to_string())
 }
 
+#[allow(dead_code)]
 #[tauri::command]
 async fn native_fetch_bytes(url: String) -> Result<Vec<u8>, String> {
     let client = reqwest::Client::builder().user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 fg-manager").build().unwrap();
     client.get(&url).send().await.map_err(|e| e.to_string())?.bytes().await.map_err(|e| e.to_string()).map(|b| b.to_vec())
+}
+
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -125,7 +132,8 @@ pub fn run() {
         cmds::set_download_speed_limit,
         cmds::check_autostart_hidden,
         native_fetch,
-        native_fetch_bytes
+        native_fetch_bytes,
+        quit_app
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
