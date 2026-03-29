@@ -263,6 +263,19 @@ pub async fn start_download(
                     }
                 }).await;
                 
+                // Cleanup Phase: Remove raw downloaded parts to reclaim disk space
+                if let Ok(entries) = std::fs::read_dir(&extract_to) {
+                    for entry in entries.filter_map(|e| e.ok()) {
+                        let path = entry.path();
+                        if let Some(ext) = path.extension() {
+                            let ext_str = ext.to_string_lossy().to_lowercase();
+                            if ext_str == "rar" || ext_str == "zip" || (ext_str.starts_with('r') && ext_str.len() == 3) {
+                                let _ = std::fs::remove_file(path);
+                            }
+                        }
+                    }
+                }
+                
                 // Phase 3: Find setup.exe and extract .iss
                 let mut setup_exe = None;
                 if let Ok(entries) = std::fs::read_dir(&extract_to) {
