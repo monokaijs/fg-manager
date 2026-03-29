@@ -1,0 +1,106 @@
+name: Release Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version Bump Type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  bump-version:
+    name: Bump Version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      new_version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          
+      - name: Bump Version
+        id: bump
+        run: |
+          cd apps/desktop
+          npm version ${{ github.event.inputs.version_bump }} --no-git-tag-version
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          
+          # Safely update Tauri configs
+          sed -i 's/"version": ".*"/"version": "'$NEW_VERSION'"/g' src-tauri/tauri.conf.json
+          sed -i 's/^version = ".*"/version = "'$NEW_VERSION'"/g' src-tauri/Cargo.toml
+          
+          echo "version=v$NEW_VERSION" >> $GITHUB_OUTPUT
+          
+      - name: Commit and Tag
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git commit -a -m "chore: bump version to ${{ steps.bump.outputs.version }} [skip ci]"
+          git push
+          git tag ${{ steps.bump.outputs.version }}
+          git push origin ${{ steps.bump.outputs.version }}
+
+  build-release:
+    name: Release
+    needs: bump-version
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bump-version.outputs.new_version }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 8
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - name: Install Rust Stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'ubuntu-22.04' && 'x86_64-unknown-linux-gnu' || 'x86_64-pc-windows-msvc' }}
+
+      - name: Setup Linux OS Dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf innoextract
+
+      - name: Install Workspace Dependencies
+        run: pnpm install
+
+      - name: Build & Publish Release via Tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: ./apps/desktop
+          tagName: ${{ needs.bump-version.outputs.new_version }}
+          releaseName: 'FG Manager ${{ needs.bump-version.outputs.new_version }}'
+          releaseBody: 'Fully Automated Release build pipeline via GitHub Actions.'
+          releaseDraft: false
+          prerelease: false
