@@ -22,6 +22,7 @@ pub struct FFTaskStats {
     pub eta: u64,
     pub total_size: u64,
     pub downloaded: u64,
+    pub executable_path: Option<String>,
 }
 
 pub struct FFTask {
@@ -38,6 +39,7 @@ pub struct FFTask {
     pub token: Arc<AtomicBool>,
     pub custom_dir: Option<PathBuf>,
     pub extracting_progress: f64,
+    pub executable_path: Option<String>,
 }
 
 pub struct FuckingFastState {
@@ -217,6 +219,69 @@ pub async fn start_download(
                         }
                     }
                 }).await;
+                
+                // Phase 3: Find setup.exe and extract .iss
+                let mut setup_exe = None;
+                if let Ok(entries) = std::fs::read_dir(&extract_to) {
+                    for entry in entries.filter_map(|e| e.ok()) {
+                        if entry.file_name() == "setup.exe" {
+                            setup_exe = Some(entry.path());
+                            break;
+                        }
+                    }
+                }
+
+                if let Some(setup_path) = setup_exe {
+                    {
+                        let mut t = tasks.lock().await;
+                        if let Some(task) = t.get_mut(&id) {
+                            task.status = "installing".to_string();
+                        }
+                    }
+
+                    // Extract install_script.iss
+                    let _ = std::process::Command::new("innoextract")
+                        .arg("--extract")
+                        .arg("install_script.iss")
+                        .arg(&setup_path)
+                        .current_dir(&extract_to)
+                        .output();
+
+                    let iss_path = extract_to.join("install_script.iss");
+                    if let Ok(script_content) = std::fs::read_to_string(&iss_path) {
+                        for line in script_content.lines() {
+                            if line.contains("Filename: \"{app}\\") && line.contains(".exe\"") {
+                                if let Some(start) = line.find("\"{app}\\") {
+                                    if let Some(end) = line[start + 7..].find('\"') {
+                                        let exe = &line[start + 7..start + 7 + end];
+                                        let full_exe = extract_to.join(exe.replace("\\", "/"));
+                                        let mut t = tasks.lock().await;
+                                        if let Some(task) = t.get_mut(&id) {
+                                            task.executable_path = Some(full_exe.to_string_lossy().to_string());
+                                        }
+                                        break; // Found it
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Phase 4: Launch the installer
+                    #[cfg(target_os = "windows")]
+                    let mut child = std::process::Command::new(&setup_path)
+                        .current_dir(&extract_to)
+                        .spawn();
+
+                    #[cfg(not(target_os = "windows"))]
+                    let mut child = std::process::Command::new("wine")
+                        .arg(&setup_path)
+                        .current_dir(&extract_to)
+                        .spawn();
+
+                    if let Ok(mut c) = child {
+                        let _ = c.wait(); // Wait for user to finish installing
+                    }
+                }
             }
         }
     }
@@ -251,6 +316,7 @@ pub async fn ff_add_urls(id: String, game_slug: String, urls: Vec<String>, downl
             token: token.clone(),
             custom_dir,
             extracting_progress: 0.0,
+            executable_path: None,
         });
     }
 
@@ -380,6 +446,7 @@ pub async fn ff_get_tasks(state: State<'_, FuckingFastState>) -> Result<Vec<FFTa
             eta,
             total_size: estimated_total_size,
             downloaded: task.progress_bytes,
+            executable_path: task.executable_path.clone(),
         });
     }
 

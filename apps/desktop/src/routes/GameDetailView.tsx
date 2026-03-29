@@ -235,12 +235,12 @@ export default function GameDetailView() {
           {activeTask && (
             <div className={`w-full mb-8 rounded-xl p-5 border shadow-sm ${activeTask.status === 'extracting' ? 'bg-amber-500/10 border-amber-500/30' : 'bg-card border-border'}`}>
               <div className="flex justify-between items-center mb-3">
-                <h4 className={`text-sm font-semibold tracking-tight capitalize flex items-center gap-2 ${activeTask.status === 'extracting' ? 'text-amber-500' : 'text-primary'}`}>
-                   {activeTask.status === 'extracting' ? 'Extracting Archive: Do Not Turn Off' : `Downloading: ${activeTask.status}`}
+                <h4 className={`text-sm font-semibold tracking-tight capitalize flex items-center gap-2 ${activeTask.status === 'extracting' ? 'text-amber-500' : activeTask.status === 'installing' ? 'text-green-500' : 'text-primary'}`}>
+                   {activeTask.status === 'extracting' ? 'Extracting Archive: Do Not Turn Off' : activeTask.status === 'installing' ? 'Installing: Please complete the setup wizard' : `Downloading: ${activeTask.status}`}
                 </h4>
                 <span className="text-xs font-medium text-muted-foreground">{Math.round(activeTask.progress * 100)}%</span>
               </div>
-              <Progress value={activeTask.progress * 100} className={`h-1.5 mb-3 ${activeTask.status === 'extracting' ? 'bg-amber-500/20 [&>div]:bg-amber-500' : ''}`} />
+              <Progress value={activeTask.progress * 100} className={`h-1.5 mb-3 ${activeTask.status === 'extracting' ? 'bg-amber-500/20 [&>div]:bg-amber-500' : activeTask.status === 'installing' ? 'bg-green-500/20 [&>div]:bg-green-500' : ''}`} />
               <div className="flex justify-between items-end">
                  <div className="flex flex-col gap-1 text-xs text-muted-foreground">
                    <span>{formatBytes(activeTask.downloaded)} / {formatBytes(activeTask.totalSize)}</span>
