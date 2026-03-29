@@ -48,14 +48,14 @@ export default function GameDetailView() {
     <div className="relative min-h-[120vh] pb-[25vh]">
       {/* Absolute Header Gradient */}
       <div className="absolute inset-x-0 top-0 h-96 z-0 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/80 to-background z-10" />
-        <img loading="lazy" decoding="async" src={heroImage} className="w-full h-full object-cover opacity-30 blur-sm scale-105" alt="Blur bg" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-background/80 to-background z-10" />
+        <img loading="lazy" decoding="async" src={heroImage} className="w-full h-full object-cover opacity-20 scale-105" alt="Blur bg" />
       </div>
 
       <div className="relative z-10 block">
         <header
           data-tauri-drag-region
-          className="flex h-16 items-center px-8 border-b border-border bg-background/50 sticky top-0 transition-[padding] duration-200 backdrop-blur-md z-50"
+          className="flex h-16 items-center px-8 border-b border-border bg-background sticky top-0 transition-[padding] duration-200 z-50"
         >
           <Link to="/games" className="mr-4 text-muted-foreground hover:text-foreground transition-colors flex items-center z-10">
             <ArrowLeft className="w-5 h-5 mr-2" /> Back to Catalog
